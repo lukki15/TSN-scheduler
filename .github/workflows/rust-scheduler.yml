@@ -1,0 +1,75 @@
+name: Rust Scheduler CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and package scheduler-cli
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: network-scheduler
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            runner: macos-latest
+            target: x86_64-apple-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+        with:
+          rust-target: ${{ matrix.target }}
+
+      - name: Build workspace
+        run: cargo build --workspace --release #--locked
+
+      - name: Build scheduler-cli only
+        run: cargo build -p scheduler-cli --release --target ${{ matrix.target }} #--locked
+
+      - name: Verify CLI binary exists
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            test -f target/${{ matrix.target }}/release/scheduler-cli.exe
+            ls -lh target/${{ matrix.target }}/release/scheduler-cli.exe
+          else
+            test -f target/${{ matrix.target }}/release/scheduler-cli
+            ls -lh target/${{ matrix.target }}/release/scheduler-cli
+          fi
+        shell: bash
+
+      - name: Create release artifacts directory
+        run: mkdir -p artifacts
+        shell: bash
+
+      - name: Copy binary to artifacts
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp target/${{ matrix.target }}/release/scheduler-cli.exe artifacts/scheduler-cli-${{ matrix.os }}.exe
+          else
+            cp target/${{ matrix.target }}/release/scheduler-cli artifacts/scheduler-cli-${{ matrix.os }}
+          fi
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: scheduler-cli-${{ matrix.os }}
+          path: network-scheduler/artifacts/
+          if-no-files-found: error
+          retention-days: 7

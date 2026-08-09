@@ -1,0 +1,34 @@
+name: Build Rust CLI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: network-scheduler
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Rust setup
+        uses: ./.github/actions/rust-setup
+        with:
+          components: rustfmt clippy
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Test
+        run: cargo test --workspace --release #--locked
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
