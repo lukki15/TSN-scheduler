@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/scheduler-core",
+    "crates/scheduler-io",
+    "crates/scheduler-cli",
+]
+
+resolver = "3"

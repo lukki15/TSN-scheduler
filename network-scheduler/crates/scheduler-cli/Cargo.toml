@@ -1,0 +1,8 @@
+[package]
+name = "scheduler-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+scheduler-core = { path = "../scheduler-core" }
+scheduler-io = { path = "../scheduler-io" }
