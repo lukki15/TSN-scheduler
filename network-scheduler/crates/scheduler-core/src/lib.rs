@@ -1,6 +1,6 @@
 pub mod types;
 
-pub use types::{EdgeData, NodeData, NodeId};
+pub use types::{EdgeData, NodeData, NodeId, Stream};
 
 #[cfg(test)]
 mod tests {

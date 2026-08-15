@@ -8,3 +8,5 @@ scheduler-core = { path = "../scheduler-core" }
 petgraph = "0.8"
 quick-xml = "0.41"
 thiserror = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
