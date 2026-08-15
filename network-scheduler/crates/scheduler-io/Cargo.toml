@@ -5,3 +5,6 @@ edition = "2024"
 
 [dependencies]
 scheduler-core = { path = "../scheduler-core" }
+petgraph = "0.8"
+quick-xml = "0.41"
+thiserror = "2"
