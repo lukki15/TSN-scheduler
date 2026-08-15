@@ -1,0 +1,11 @@
+[
+    {
+        "name": "stream1",
+        "message_size": 128,
+        "period_ns": 1000000,
+        "e2e_latency_ns": 500000,
+        "max_jitter_ns": 1000,
+        "start_node": "A",
+        "end_node": "B"
+    }
+]

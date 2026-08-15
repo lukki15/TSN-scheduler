@@ -26,5 +26,21 @@ From the `network-scheduler` root:
 
 ```bash
 cargo check
-cargo run -p scheduler-cli
+cargo run -p scheduler-cli -- -h
 ```
+
+## Example: run the CLI with example fixtures
+
+Two example input files are provided in the `examples/` directory: `examples/graphml.xml` (GraphML topology) and `examples/streams.json` (streams description). To run the CLI and print a schedule to stdout:
+
+```bash
+cargo run -p scheduler-cli -- -g examples/graphml.xml -s examples/streams.json
+```
+
+To write the schedule to a file instead of printing to stdout, pass `-o`/`--output`:
+
+```bash
+cargo run -p scheduler-cli -- -g examples/graphml.xml -s examples/streams.json -o out.json
+```
+
+These files are intended as usage examples; feel free to modify them to exercise different topologies and streams.

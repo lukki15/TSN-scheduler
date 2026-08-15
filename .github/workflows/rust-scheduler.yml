@@ -53,6 +53,15 @@ jobs:
           fi
         shell: bash
 
+      - name: Run scheduler-cli --version
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            target/${{ matrix.target }}/release/scheduler-cli.exe --version
+          else
+            target/${{ matrix.target }}/release/scheduler-cli --version
+          fi
+        shell: bash
+
       - name: Create release artifacts directory
         run: mkdir -p artifacts
         shell: bash

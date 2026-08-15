@@ -30,5 +30,9 @@ jobs:
       - name: Test
         run: cargo test --workspace --release #--locked
 
+      - name: Run scheduler-cli --version
+        run: cargo run -p scheduler-cli -- --version
+        shell: bash
+
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
