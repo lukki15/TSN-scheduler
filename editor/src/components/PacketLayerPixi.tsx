@@ -16,6 +16,12 @@ import { usePlaybackStore } from '../store/playbackStore';
 const PACKET_SIZE = 14;
 const PACKET_SIZE_SELECTED = 20;
 const TEXTURE_SIZE = 128;
+/** Other streams fade back while one stream is selected. */
+const DIMMED_ALPHA = 0.55;
+/** A frame still leaving its sender is drawn slightly translucent. */
+const TX_ALPHA = 0.8;
+/** Packets fade in over the first part of their route, like ArchAlive's client fade-in. */
+const FADE_IN_ROUTE_PROGRESS = 0.1;
 
 // ─── Imperative scene (plain objects, no React) ──────────────────────────────
 
@@ -179,13 +185,18 @@ function renderFrame(scene: Scene, input: FrameInput) {
             scene.tints.set(hue, tint);
         }
 
-        const size = p.stream_id === selectedId ? PACKET_SIZE_SELECTED : PACKET_SIZE;
+        const emphasized = p.stream_id === selectedId;
+        const size = emphasized ? PACKET_SIZE_SELECTED : PACKET_SIZE;
+        let alpha = selectedId !== null && !emphasized ? DIMMED_ALPHA : 1;
+        if (p.phase === 'tx') alpha *= TX_ALPHA;
+        if (p.routeProgress < FADE_IN_ROUTE_PROGRESS) alpha *= p.routeProgress / FADE_IN_ROUTE_PROGRESS;
+
         sprite.visible = true;
         sprite.position.set(pos.x + normal.x * lane, pos.y + normal.y * lane);
         sprite.width = size;
         sprite.height = size;
         sprite.tint = tint;
-        sprite.alpha = 1;
+        sprite.alpha = alpha;
     }
     hideFrom(pool, used);
 }
