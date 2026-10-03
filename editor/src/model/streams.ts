@@ -1,5 +1,5 @@
 import { DEFAULT_STREAM, STREAM_NAME_PREFIX } from './defaults';
-import { buildAdjacency, indexLinks, nextFreeName } from './graph';
+import { buildAdjacency, indexLinks, nextFreeName, pairKey } from './graph';
 import type { RoutingStrategy } from './routing';
 import type {
     GraphLink,
@@ -98,6 +98,28 @@ export function selectedStreamId(selection: Selection | null): StreamId | null {
 export function selectedStream(selection: Selection | null, streams: readonly Stream[]): Stream | undefined {
     const id = selectedStreamId(selection);
     return id === null ? undefined : streams.find((s) => s.id === id);
+}
+
+/** True when a stream starts, ends or passes through one of `keys`. */
+export function routesTouchNodes(streams: readonly Stream[], keys: ReadonlySet<NodeKey>): boolean {
+    return streams.some(
+        (s) =>
+            (s.start_node !== null && keys.has(s.start_node)) ||
+            (s.end_node !== null && keys.has(s.end_node)) ||
+            s.route.some((k) => keys.has(k)),
+    );
+}
+
+/** True when any stream's route travels one of `links` (consecutive route nodes equal the link's endpoints). */
+export function routesUseLinks(streams: readonly Stream[], links: readonly GraphLink[]): boolean {
+    if (links.length === 0) return false;
+    const keys = new Set(links.map((l) => pairKey(l.source, l.target)));
+    return streams.some((s) => {
+        for (let i = 0; i + 1 < s.route.length; i++) {
+            if (keys.has(pairKey(s.route[i], s.route[i + 1]))) return true;
+        }
+        return false;
+    });
 }
 
 export const EMPTY_HIGHLIGHT: RouteHighlight = Object.freeze({ nodes: {}, links: {} }) as RouteHighlight;
