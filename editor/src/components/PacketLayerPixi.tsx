@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useRef, type RefObject } from 'react';
 import { Application, useApplication, useTick } from '@pixi/react';
-import { Color, Container, Sprite, Texture, type Application as PixiApplication } from 'pixi.js';
+import { Color, Container, Graphics, type Application as PixiApplication } from 'pixi.js';
 import { useStoreApi, type InternalNode } from '@xyflow/react';
-import { cubicAt, cubicNormalAt, edgeGeometry, type AnchorHandle, type AnchorNode, type Cubic, type Side } from '../model/bezier';
+import { cubicAt, cubicNormalAt, edgeGeometry, type AnchorHandle, type AnchorNode, type Cubic, type Point, type Side } from '../model/bezier';
 import { hueToCss } from '../model/colors';
 import { linkSources } from '../model/graph';
 import { buildLanes, packetsAt } from '../model/packets';
@@ -13,9 +13,13 @@ import type { LinkId, NodeKey, Selection, Stream, StreamId } from '../model/type
 import { useEditorStore, type EditorLink, type EditorNode } from '../store/editorStore';
 import { usePlaybackStore } from '../store/playbackStore';
 
-const PACKET_SIZE = 14;
-const PACKET_SIZE_SELECTED = 20;
-const TEXTURE_SIZE = 128;
+/** Bar thickness in flow px (the dots were 14 px wide). */
+const BAR_WIDTH = 8;
+const BAR_WIDTH_SELECTED = 12;
+/** Frames shorter than this on screen are stretched so they stay visible. */
+const MIN_BAR_LENGTH = 24;
+/** Polyline samples per unit of bezier parameter when tracing a bar. */
+const SAMPLES_PER_UNIT = 32;
 /** Other streams fade back while one stream is selected. */
 const DIMMED_ALPHA = 0.55;
 /** A frame still leaving its sender is drawn slightly translucent. */
@@ -27,8 +31,8 @@ const FADE_IN_ROUTE_PROGRESS = 0.1;
 
 interface Scene {
     layer: Container;
-    texture: Texture;
-    pool: Sprite[];
+    /** All bars of a frame are drawn into this one graphics object and cleared every tick. */
+    graphics: Graphics;
     tints: Map<number, number>;
     /** Lookups derived from store arrays, rebuilt only when the array reference changes. */
     lanesFor: Schedule | null;
@@ -40,29 +44,14 @@ interface Scene {
     hueOf: Map<StreamId, number>;
 }
 
-/** White filled circle with a soft dark rim; tinted per stream. Same construction as ArchAlive's packet textures. */
-function createPacketTexture(): Texture {
-    const canvas = document.createElement('canvas');
-    canvas.width = TEXTURE_SIZE;
-    canvas.height = TEXTURE_SIZE;
-    const ctx = canvas.getContext('2d')!;
-    ctx.beginPath();
-    ctx.arc(TEXTURE_SIZE / 2, TEXTURE_SIZE / 2, TEXTURE_SIZE / 2 - 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.lineWidth = 12;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.stroke();
-    return Texture.from(canvas);
-}
-
 function createScene(app: PixiApplication): Scene {
     const layer = new Container();
+    const graphics = new Graphics();
+    layer.addChild(graphics);
     app.stage.addChild(layer);
     return {
         layer,
-        texture: createPacketTexture(),
-        pool: [],
+        graphics,
         tints: new Map(),
         lanesFor: null,
         lanes: new Map(),
@@ -78,7 +67,6 @@ function destroyScene(app: PixiApplication, scene: Scene) {
     try {
         if (app.stage) app.stage.removeChild(scene.layer);
         scene.layer.destroy({ children: true });
-        scene.texture.destroy(true);
     } catch {
         // the application may already be destroyed during teardown
     }
@@ -101,8 +89,56 @@ function toAnchorNode(node: InternalNode<EditorNode>): AnchorNode {
     };
 }
 
-function hideFrom(pool: Sprite[], index: number) {
-    for (let i = index; i < pool.length; i++) pool[i].visible = false;
+interface LinkGeometry {
+    cubic: Cubic;
+    /** Approximate arc length in flow px, for the minimum visible bar length. */
+    length: number;
+}
+
+function approximateLength(cubic: Cubic): number {
+    let length = 0;
+    let prev = cubicAt(cubic, 0);
+    for (let i = 1; i <= 16; i++) {
+        const next = cubicAt(cubic, i / 16);
+        length += Math.hypot(next.x - prev.x, next.y - prev.y);
+        prev = next;
+    }
+    return length;
+}
+
+/** Point on the curve shifted into the lane along the local normal. */
+function lanePoint(cubic: Cubic, u: number, lane: number): Point {
+    const pos = cubicAt(cubic, u);
+    if (lane === 0) return pos;
+    const n = cubicNormalAt(cubic, u);
+    return { x: pos.x + n.x * lane, y: pos.y + n.y * lane };
+}
+
+/**
+ * Traces the bar between parameters `u0` and `u1` (either order) as a polyline
+ * and strokes it. Short bars are stretched to MIN_BAR_LENGTH around their centre.
+ */
+function strokeBar(g: Graphics, geometry: LinkGeometry, u0: number, u1: number, lane: number, width: number, color: number, alpha: number) {
+    let a = Math.min(u0, u1);
+    let b = Math.max(u0, u1);
+    const minSpan = geometry.length > 0 ? Math.min(1, MIN_BAR_LENGTH / geometry.length) : 0;
+    if (b - a < minSpan) {
+        const center = (a + b) / 2;
+        a = center - minSpan / 2;
+        b = center + minSpan / 2;
+        if (a < 0) { b -= a; a = 0; }
+        if (b > 1) { a -= b - 1; b = 1; }
+    }
+
+    const steps = Math.max(2, Math.ceil((b - a) * SAMPLES_PER_UNIT));
+    const first = lanePoint(geometry.cubic, a, lane);
+    g.beginPath();
+    g.moveTo(first.x, first.y);
+    for (let i = 1; i <= steps; i++) {
+        const p = lanePoint(geometry.cubic, a + ((b - a) * i) / steps, lane);
+        g.lineTo(p.x, p.y);
+    }
+    g.stroke({ width, color, alpha, cap: 'round', join: 'round' });
 }
 
 interface FrameInput {
@@ -116,16 +152,18 @@ interface FrameInput {
     selection: Selection | null;
 }
 
-/** Places one sprite per in-flight packet exactly on the drawn edge, offset into its lane. */
+/**
+ * Draws one bar per in-flight frame, spanning the link from the frame's last
+ * bit (tail) to its first bit (head), exactly on the drawn edge and offset into
+ * the stream's lane.
+ */
 function renderFrame(scene: Scene, input: FrameInput) {
-    const { layer, pool } = scene;
+    const { layer, graphics } = scene;
     layer.position.set(input.transform[0], input.transform[1]);
     layer.scale.set(input.transform[2]);
+    graphics.clear();
 
-    if (input.playback.status === 'stopped') {
-        hideFrom(pool, 0);
-        return;
-    }
+    if (input.playback.status === 'stopped') return;
 
     if (scene.edgesFor !== input.edges) {
         scene.edgesFor = input.edges;
@@ -133,10 +171,7 @@ function renderFrame(scene: Scene, input: FrameInput) {
         scene.sourceOf = linkSources(input.edges);
     }
     const packets = packetsAt(input.schedule, timeAt(input.playback, input.nowMs), scene.sourceOf);
-    if (packets.length === 0) {
-        hideFrom(pool, 0);
-        return;
-    }
+    if (packets.length === 0) return;
 
     if (scene.lanesFor !== input.schedule) {
         scene.lanesFor = input.schedule;
@@ -148,57 +183,41 @@ function renderFrame(scene: Scene, input: FrameInput) {
     }
 
     const selectedId = selectedStreamId(input.selection);
-    const geometry = new Map<LinkId, Cubic>();
+    const geometries = new Map<LinkId, LinkGeometry>();
 
-    let used = 0;
     for (const p of packets) {
         const edge = scene.edgeLookup.get(p.link_id);
         if (!edge) continue;
 
-        let cubic = geometry.get(p.link_id);
-        if (!cubic) {
+        let geometry = geometries.get(p.link_id);
+        if (!geometry) {
             const source = input.nodeLookup.get(edge.source);
             const target = input.nodeLookup.get(edge.target);
             if (!source || !target) continue;
-            cubic = edgeGeometry(toAnchorNode(source), edge.sourceHandle, toAnchorNode(target), edge.targetHandle);
-            geometry.set(p.link_id, cubic);
+            const cubic = edgeGeometry(toAnchorNode(source), edge.sourceHandle, toAnchorNode(target), edge.targetHandle);
+            geometry = { cubic, length: approximateLength(cubic) };
+            geometries.set(p.link_id, geometry);
         }
 
-        const u = p.direction === 'forward' ? p.progress : 1 - p.progress;
-        const pos = cubicAt(cubic, u);
-        const normal = cubicNormalAt(cubic, u);
+        // head/tail are measured from → to; the cubic runs source → target
+        const uHead = p.direction === 'forward' ? p.head : 1 - p.head;
+        const uTail = p.direction === 'forward' ? p.tail : 1 - p.tail;
         const lane = scene.lanes.get(p.link_id)?.get(p.stream_id) ?? 0;
 
-        let sprite = pool[used];
-        if (!sprite) {
-            sprite = new Sprite(scene.texture);
-            sprite.anchor.set(0.5);
-            layer.addChild(sprite);
-            pool.push(sprite);
-        }
-        used++;
-
         const hue = scene.hueOf.get(p.stream_id) ?? 0;
-        let tint = scene.tints.get(hue);
-        if (tint === undefined) {
-            tint = new Color(hueToCss(hue)).toNumber();
-            scene.tints.set(hue, tint);
+        let color = scene.tints.get(hue);
+        if (color === undefined) {
+            color = new Color(hueToCss(hue)).toNumber();
+            scene.tints.set(hue, color);
         }
 
         const emphasized = p.stream_id === selectedId;
-        const size = emphasized ? PACKET_SIZE_SELECTED : PACKET_SIZE;
         let alpha = selectedId !== null && !emphasized ? DIMMED_ALPHA : 1;
         if (p.phase === 'tx') alpha *= TX_ALPHA;
         if (p.routeProgress < FADE_IN_ROUTE_PROGRESS) alpha *= p.routeProgress / FADE_IN_ROUTE_PROGRESS;
 
-        sprite.visible = true;
-        sprite.position.set(pos.x + normal.x * lane, pos.y + normal.y * lane);
-        sprite.width = size;
-        sprite.height = size;
-        sprite.tint = tint;
-        sprite.alpha = alpha;
+        strokeBar(graphics, geometry, uTail, uHead, lane, emphasized ? BAR_WIDTH_SELECTED : BAR_WIDTH, color, alpha);
     }
-    hideFrom(pool, used);
 }
 
 // ─── React glue ──────────────────────────────────────────────────────────────
@@ -280,7 +299,7 @@ export interface PacketLayerPixiProps {
     resizeTo: RefObject<HTMLDivElement | null>;
 }
 
-/** Transparent GPU layer over the React Flow canvas that animates scheduled packets. */
+/** Transparent GPU layer over the React Flow canvas that animates scheduled frames as bars along the links. */
 export const PacketLayerPixi = memo(function PacketLayerPixi({ resizeTo }: PacketLayerPixiProps) {
     return (
         <Application
