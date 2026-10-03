@@ -1,0 +1,80 @@
+import { useCallback, useRef } from 'react';
+import { Pause, Play, Square } from 'lucide-react';
+import { SPEEDS, formatSimTime } from '../model/playback';
+import { usePlaybackStore } from '../store/playbackStore';
+import { usePlaybackFrame } from './usePlaybackFrame';
+
+const PILL = 'flex items-center gap-2 px-5 py-2.5 rounded-full shadow-lg border transition-all duration-300';
+const PILL_IDLE = 'bg-white/95 backdrop-blur-sm text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md hover:text-blue-600';
+const PILL_RESUME = 'bg-white text-green-600 border-green-200 ring-4 ring-green-500/10 shadow-[0_0_20px_rgba(34,197,94,0.15)] animate-pulse';
+
+/**
+ * Bottom-left transport controls in the style of ArchAlive's Pause button:
+ * Play/Pause, Stop, speed steps and a simulation clock. The clock is written
+ * straight into the DOM from the playback frame loop so nothing re-renders per
+ * frame.
+ */
+export function PlaybackControls() {
+    const status = usePlaybackStore((s) => s.status);
+    const speed = usePlaybackStore((s) => s.speed);
+    const toggle = usePlaybackStore((s) => s.toggle);
+    const stop = usePlaybackStore((s) => s.stop);
+    const setSpeed = usePlaybackStore((s) => s.setSpeed);
+
+    const clockRef = useRef<HTMLSpanElement>(null);
+    const lastText = useRef('');
+
+    usePlaybackFrame(
+        useCallback((timeNs: number) => {
+            const el = clockRef.current;
+            if (!el) return;
+            const text = formatSimTime(timeNs);
+            if (text === lastText.current) return;
+            lastText.current = text;
+            el.textContent = text;
+        }, []),
+    );
+
+    const isPlaying = status === 'playing';
+    const isPaused = status === 'paused';
+
+    return (
+        <div className="absolute bottom-4 left-4 z-[150] flex items-center gap-2">
+            <button
+                onClick={toggle}
+                className={`${PILL} ${isPaused ? PILL_RESUME : PILL_IDLE}`}
+                title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play schedule'}
+            >
+                {isPlaying ? <Pause size={16} /> : <Play size={16} className="fill-current" />}
+                <span className="text-sm font-bold">{isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play'}</span>
+            </button>
+
+            <button
+                onClick={stop}
+                disabled={status === 'stopped'}
+                className={`${PILL} ${PILL_IDLE} !px-3.5 disabled:opacity-50 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-white/95 disabled:hover:shadow-lg`}
+                title="Stop and reset to t = 0"
+            >
+                <Square size={16} className="fill-current" />
+            </button>
+
+            <div className="flex items-center p-1 rounded-full shadow-lg border border-slate-200 bg-white/95 backdrop-blur-sm">
+                {SPEEDS.map((s) => (
+                    <button
+                        key={s}
+                        onClick={() => setSpeed(s)}
+                        aria-pressed={s === speed}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${s === speed ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+                        title={`Playback speed ${s}x`}
+                    >
+                        {s}x
+                    </button>
+                ))}
+            </div>
+
+            <div className="px-4 py-2.5 rounded-full shadow-lg border border-slate-200 bg-white/95 backdrop-blur-sm font-mono text-sm font-bold text-slate-700 tabular-nums min-w-[11rem] text-right">
+                <span ref={clockRef}>{formatSimTime(0)}</span>
+            </div>
+        </div>
+    );
+}

@@ -2,6 +2,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { usePersistence } from '../store/usePersistence';
 import { EditorCanvas } from './EditorCanvas';
+import { PlaybackControls } from './PlaybackControls';
 import { Sidebar } from './Sidebar';
 import { StreamsPanel } from './StreamsPanel';
 import { Inspector } from './inspector/Inspector';
@@ -22,6 +23,9 @@ export function Editor() {
 
                     {/* Streams */}
                     <StreamsPanel />
+
+                    {/* Playback controls — bottom left */}
+                    <PlaybackControls />
                 </div>
             </ReactFlowProvider>
         </main>
