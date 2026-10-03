@@ -14,6 +14,7 @@ import { DEFAULT_LINK, DEFAULT_PRECISION } from '../model/defaults';
 import { canConnect, isNodeIdAvailable, nextFreeNodeId, pruneDanglingLinks } from '../model/graph';
 import { EMPTY_SNAPSHOT, loadSnapshot, type EditorSnapshot, type StorageLike } from '../model/persistence';
 import { defaultRouting } from '../model/routing';
+import { EMPTY_SCHEDULE, defaultScheduler, type Schedule } from '../model/schedule';
 import { buildRouteHighlight, newStream, recomputeRoutes, routesTouchNodes, routesUseLinks } from '../model/streams';
 import type {
     EdgeData,
@@ -40,6 +41,8 @@ export interface EditorData {
     selection: Selection | null;
     viewport: Viewport;
     routeHighlight: RouteHighlight;
+    /** Derived from streams and links by the scheduler; drives packet playback. */
+    schedule: Schedule;
 }
 
 export interface EditorActions {
@@ -66,11 +69,33 @@ export type EditorState = EditorData & EditorActions;
 
 type Topology = Pick<EditorData, 'nodes' | 'edges' | 'streams' | 'selection'>;
 
-/** Recomputes routes and the highlight for a topology change, all inside one state update. */
-function withRoutes<T extends Topology>(state: T): T & Pick<EditorData, 'streams' | 'routeHighlight'> {
-    const streams = recomputeRoutes(state.streams, state.nodes, state.edges, defaultRouting);
-    return { ...state, streams, routeHighlight: buildRouteHighlight(state.selection, streams, state.edges) };
+/**
+ * The schedule depends only on the streams and the links. Remember the last
+ * input so a derivation with unchanged streams and links hands back the same
+ * schedule object, and memos keyed on its identity stay warm.
+ */
+let lastSchedule: { streams: Stream[]; edges: EditorLink[]; schedule: Schedule } | null = null;
+
+function scheduleFor(streams: Stream[], edges: EditorLink[]): Schedule {
+    if (lastSchedule && lastSchedule.streams === streams && lastSchedule.edges === edges) return lastSchedule.schedule;
+    const schedule = streams.length === 0 ? EMPTY_SCHEDULE : defaultScheduler.schedule(streams, edges);
+    lastSchedule = { streams, edges, schedule };
+    return schedule;
 }
+
+/** Recomputes routes, the highlight and the schedule for a topology change, all inside one state update. */
+function withRoutes<T extends Topology>(state: T): T & Pick<EditorData, 'streams' | 'routeHighlight' | 'schedule'> {
+    const streams = recomputeRoutes(state.streams, state.nodes, state.edges, defaultRouting);
+    return {
+        ...state,
+        streams,
+        routeHighlight: buildRouteHighlight(state.selection, streams, state.edges),
+        schedule: scheduleFor(streams, state.edges),
+    };
+}
+
+/** Stream fields that feed routing or the schedule; other edits (name, latency bounds) skip the derivation. */
+const SCHEDULE_FIELDS: readonly (keyof StreamSpec)[] = ['start_node', 'end_node', 'message_size', 'period_ns'];
 
 function dropSelectionIf(selection: Selection | null, kind: Selection['kind'], removed: Set<string>): Selection | null {
     return selection && selection.kind === kind && removed.has(selection.id) ? null : selection;
@@ -219,9 +244,12 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     },
 
     updateLink: (id, patch) => {
-        set({
-            edges: get().edges.map((e) => (e.id === id ? { ...e, data: { ...e.data, ...patch } } : e)),
-        });
+        // length / bandwidth feed the schedule, so derive like a topology change
+        const state = get();
+        const link = state.edges.find((e) => e.id === id);
+        if (!link || (Object.keys(patch) as (keyof EdgeData)[]).every((k) => link.data[k] === patch[k])) return;
+        const edges = state.edges.map((e) => (e.id === id ? { ...e, data: { ...e.data, ...patch } } : e));
+        set(withRoutes({ ...state, edges }));
     },
 
     removeLink: (id) => {
@@ -239,7 +267,8 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     updateStream: (id, patch) => {
         const state = get();
         const streams = state.streams.map((s) => (s.id === id ? { ...s, ...patch } : s));
-        set(withRoutes({ ...state, streams }));
+        if (SCHEDULE_FIELDS.some((field) => field in patch)) set(withRoutes({ ...state, streams }));
+        else set({ streams });
     },
 
     removeStream: (id) => {
