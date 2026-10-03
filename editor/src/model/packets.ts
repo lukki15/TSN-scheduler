@@ -1,3 +1,4 @@
+import { clamp01 } from './math';
 import type { HopSchedule, Schedule, StreamSchedule } from './schedule';
 import type { LinkDirection, LinkId, NodeKey, StreamId } from './types';
 
@@ -10,8 +11,12 @@ export interface PacketPosition {
     instance: number;
     /** `'forward'` when the packet travels source → target of the link. */
     direction: LinkDirection;
-    /** 0..1 along from → to over [tx_start, rx_end]. */
+    /** 0..1 along from → to over [tx_start, rx_end]: the frame's time-based center of travel. */
     progress: number;
+    /** Position of the first bit along from → to (0..1). Leaves at tx_start, arrives tx_start + propagation. */
+    head: number;
+    /** Position of the last bit along from → to (0..1). Leaves at tx_end, arrives at rx_end. */
+    tail: number;
     /** Still leaving the sender, or fully on the wire. */
     phase: PacketPhase;
     /** 0..1 over the whole route of this transmission (for fade effects). */
@@ -69,12 +74,18 @@ export function packetsAt(schedule: Schedule, timeNs: number, sourceOf: Readonly
             const hop = hops[hopIndex];
             const duration = hop.rx_end_ns - hop.tx_start_ns;
             if (duration <= 0) continue;
+            const propagation = hop.rx_end_ns - hop.tx_end_ns;
+            // With zero propagation the wire is "instant": the frame spans the whole link while being transmitted.
+            const head = propagation > 0 ? clamp01((tau - hop.tx_start_ns) / propagation) : 1;
+            const tail = propagation > 0 ? clamp01((tau - hop.tx_end_ns) / propagation) : 0;
             packets.push({
                 stream_id: stream.stream_id,
                 link_id: hop.link_id,
                 instance: k,
                 direction: sourceOf.get(hop.link_id) === hop.from ? 'forward' : 'reverse',
                 progress: (tau - hop.tx_start_ns) / duration,
+                head,
+                tail,
                 phase: tau < hop.tx_end_ns ? 'tx' : 'propagating',
                 routeProgress: routeLength > 0 ? (tau - routeStart) / routeLength : 1,
             });

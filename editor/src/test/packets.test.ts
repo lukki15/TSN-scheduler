@@ -49,6 +49,22 @@ describe('packetsAt', () => {
         expect(packetsAt(schedule, 300, links)).toEqual([]);
     });
 
+    it('tracks the frame extent with head and tail positions', () => {
+        // hop a → b: tx 0..100, propagation 50 → first bit arrives at 50, last bit leaves at 100 and arrives at 150
+        expect(only(0)).toMatchObject({ head: 0, tail: 0 });
+        expect(only(25)).toMatchObject({ head: 0.5, tail: 0 });
+        expect(only(75)).toMatchObject({ head: 1, tail: 0 }); // frame longer than the link: fills it
+        expect(only(125)).toMatchObject({ head: 1, tail: 0.5 });
+        expect(only(149).tail).toBeCloseTo(0.98);
+    });
+
+    it('spans the whole link while transmitting over a zero-length wire', () => {
+        const instant: Schedule = {
+            streams: [{ stream_id: 'i', period_ns: 1000, hops: [{ link_id: 'ab', from: 'a', to: 'b', tx_start_ns: 0, tx_end_ns: 100, rx_end_ns: 100 }] }],
+        };
+        expect(packetsAt(instant, 50, links)[0]).toMatchObject({ head: 1, tail: 0, phase: 'tx' });
+    });
+
     it('exposes overall route progress', () => {
         expect(only(0).routeProgress).toBe(0);
         expect(only(150).routeProgress).toBeCloseTo(0.5);
