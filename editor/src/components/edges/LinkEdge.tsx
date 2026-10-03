@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
 import { UNITS } from '../../model/defaults';
-import type { EditorLink } from '../../store/editorStore';
+import { useEditorStore, type EditorLink } from '../../store/editorStore';
 
 /**
  * Undirected link. Ported from ArchAlive's LatencyEdge (plain bezier BaseEdge)
  * with the RpsEdge label-pill pattern showing length and bandwidth while the
- * link is hovered or selected.
+ * link is hovered or selected. When the selected stream travels this link the
+ * path turns indigo with a dash animated in the direction of travel.
  */
 export function LinkEdge({
     id,
@@ -22,6 +23,8 @@ export function LinkEdge({
     selected,
 }: EdgeProps<EditorLink>) {
     const [hovered, setHovered] = useState(false);
+    // Primitive selector: undefined unless the selected stream's route uses this link
+    const routeDirection = useEditorStore((s) => s.routeHighlight.links[id]);
     const [edgePath, labelX, labelY] = getBezierPath({
         sourceX, sourceY, sourcePosition,
         targetX, targetY, targetPosition,
@@ -32,7 +35,15 @@ export function LinkEdge({
 
     return (
         <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-            <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
+            <BaseEdge
+                id={id}
+                path={edgePath}
+                markerEnd={markerEnd}
+                className={routeDirection ? 'link-edge--route' : undefined}
+                style={routeDirection
+                    ? { ...style, stroke: '#4f46e5', strokeDasharray: '8 6', animationDirection: routeDirection === 'reverse' ? 'reverse' : 'normal' }
+                    : style}
+            />
             {showLabel && (
                 <EdgeLabelRenderer>
                     <div

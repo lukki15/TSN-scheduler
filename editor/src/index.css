@@ -115,3 +115,15 @@ body {
 .react-flow__pane {
   touch-action: none;
 }
+
+/* Stream route highlight: dashes travel along the link in the stream's direction */
+.react-flow__edge-path.link-edge--route {
+  stroke-width: 3px !important;
+  animation: route-dash 1s linear infinite;
+}
+
+@keyframes route-dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}

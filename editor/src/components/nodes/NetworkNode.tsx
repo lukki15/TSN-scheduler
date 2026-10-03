@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { EditorNode } from '../../store/editorStore';
+import { useEditorStore, type EditorNode } from '../../store/editorStore';
 import { NETWORK_NODE_CONFIG } from '../node-types';
 
 const HANDLE_CLASS = '!bg-slate-50 !border-2 !border-slate-400 transition-all hover:!border-indigo-500 hover:!bg-indigo-100';
@@ -10,13 +10,15 @@ const HANDLE_CLASS = '!bg-slate-50 !border-2 !border-slate-400 transition-all ho
  * change is one connection handle per side so undirected links can attach
  * anywhere (React Flow runs in loose connection mode).
  */
-export const NetworkNode = memo(function NetworkNode({ data, selected }: NodeProps<EditorNode>) {
+export const NetworkNode = memo(function NetworkNode({ id, data, selected }: NodeProps<EditorNode>) {
     const Icon = NETWORK_NODE_CONFIG.icon;
+    // Primitive selector: this card re-renders only when its own highlight flag flips
+    const onRoute = useEditorStore((s) => s.routeHighlight.nodes[id] === true);
 
     return (
         <div className={`
             bg-gradient-to-b from-indigo-50 to-white rounded-2xl shadow-md border transition-all duration-200 hover:-translate-y-0.5 min-w-[280px] flex flex-col group
-            ${selected ? 'border-indigo-500 shadow-lg z-10' : 'border-indigo-200 hover:shadow-lg hover:border-indigo-300'}
+            ${selected ? 'border-indigo-500 shadow-lg z-10' : onRoute ? 'border-indigo-500 shadow-lg ring-4 ring-indigo-500/15' : 'border-indigo-200 hover:shadow-lg hover:border-indigo-300'}
             ${selected ? 'animate-[selection-glow_2s_ease-in-out_infinite]' : ''}
         `}>
             <Handle type="source" id="top" position={Position.Top} className={HANDLE_CLASS} style={{ top: -6, left: '50%' }} />
@@ -26,7 +28,7 @@ export const NetworkNode = memo(function NetworkNode({ data, selected }: NodePro
 
             {/* Header */}
             <div className="flex items-center gap-3 p-3 border-b bg-slate-50/30 border-slate-50 rounded-t-2xl">
-                <div className="p-2 bg-white text-indigo-600 rounded-xl shadow-sm border border-slate-100">
+                <div className={`p-2 rounded-xl shadow-sm border border-slate-100 transition-colors ${onRoute ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600'}`}>
                     <Icon size={18} />
                 </div>
                 <div className="flex flex-col">
