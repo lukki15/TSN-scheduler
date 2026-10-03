@@ -7,7 +7,7 @@ import type { Stream } from '../../model/types';
 import { useEditorStore } from '../../store/editorStore';
 import { STATUS_TEXT } from '../streamStatus';
 import { InspectorShell } from './InspectorShell';
-import { AttributeRow, DeleteButton, ErrorText, NumberField, SelectField, TitleInput } from './fields';
+import { AttributeRow, DeleteButton, ErrorText, HueDot, NumberField, SelectField, TitleInput } from './fields';
 
 export function StreamForm({ stream }: { stream: Stream }) {
     const updateStream = useEditorStore((s) => s.updateStream);
@@ -39,7 +39,12 @@ export function StreamForm({ stream }: { stream: Stream }) {
     return (
         <InspectorShell
             icon={<Waypoints size={18} />}
-            title={<TitleInput value={stream.name} onChange={(name) => updateStream(stream.id, { name })} placeholder="Stream name" />}
+            title={
+                <div className="flex items-center gap-2">
+                    <HueDot hue={stream.hue} />
+                    <TitleInput value={stream.name} onChange={(name) => updateStream(stream.id, { name })} placeholder="Stream name" />
+                </div>
+            }
             subtitle={ok ? stream.route.map((key) => displayId(nodeIds, key)).join(' → ') : <ErrorText>{STATUS_TEXT[stream.status]}</ErrorText>}
             defaultWidth={320}
         >

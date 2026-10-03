@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hueFromId } from '../model/colors';
 import { DEFAULT_LINK, DEFAULT_PRECISION, DEFAULT_STREAM } from '../model/defaults';
 import {
     DEFAULT_VIEWPORT,
@@ -20,7 +21,7 @@ const snapshot: EditorSnapshot = {
     ],
     links: [{ id: 'l1', source: 'k1', target: 'k2', sourceHandle: 'right', targetHandle: null, data: { length: 5, bandwidth: 100 } }],
     streams: [
-        { id: 's1', name: 'stream1', message_size: 64, period_ns: 2000, e2e_latency_ns: 1000, max_jitter_ns: 10, start_node: 'k1', end_node: 'k2' },
+        { id: 's1', hue: 210, name: 'stream1', message_size: 64, period_ns: 2000, e2e_latency_ns: 1000, max_jitter_ns: 10, start_node: 'k1', end_node: 'k2' },
     ],
     viewport: { x: 1, y: 2, zoom: 1.5 },
 };
@@ -45,6 +46,15 @@ describe('serialize / deserialize', () => {
         expect(deserialize('42')).toBeNull();
         expect(deserialize(JSON.stringify({ version: 2, nodes: [] }))).toBeNull();
         expect(deserialize(JSON.stringify({ nodes: [] }))).toBeNull();
+    });
+
+    it('defaults the hue of streams saved before colors existed', () => {
+        const { hue: _dropped, ...legacy } = snapshot.streams[0];
+        void _dropped;
+        const raw = JSON.stringify({ version: 1, nodes: snapshot.nodes, links: [], streams: [legacy, { ...legacy, id: 's2', hue: 725 }] });
+        const parsed = deserialize(raw)!;
+        expect(parsed.streams[0].hue).toBe(hueFromId('s1'));
+        expect(parsed.streams[1].hue).toBe(5);
     });
 
     it('drops dangling links and clears unknown stream endpoints', () => {
@@ -73,7 +83,7 @@ describe('serialize / deserialize', () => {
             { id: 'k2', position: { x: 0, y: 0 }, data: { id: 'x', precision: 0.25 } },
         ]);
         expect(parsed.links[0].data).toEqual(DEFAULT_LINK);
-        expect(parsed.streams).toEqual([{ id: 's1', name: 's1', ...DEFAULT_STREAM, start_node: null, end_node: null }]);
+        expect(parsed.streams).toEqual([{ id: 's1', hue: hueFromId('s1'), name: 's1', ...DEFAULT_STREAM, start_node: null, end_node: null }]);
         expect(parsed.viewport).toEqual(DEFAULT_VIEWPORT);
     });
 });

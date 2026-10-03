@@ -1,3 +1,4 @@
+import { hueFromId } from './colors';
 import { DEFAULT_LINK, DEFAULT_PRECISION, DEFAULT_STREAM } from './defaults';
 import type { EdgeData, LinkId, NodeData, NodeKey, StreamId, StreamSpec } from './types';
 
@@ -27,7 +28,7 @@ export interface PersistedLink {
     data: EdgeData;
 }
 
-export type PersistedStream = StreamSpec & { id: StreamId };
+export type PersistedStream = StreamSpec & { id: StreamId; hue: number };
 
 /** Everything the editor needs to restore a session. Routes are recomputed, not stored. */
 export interface EditorSnapshot {
@@ -75,6 +76,7 @@ export function serialize(snapshot: EditorSnapshot): string {
         })),
         streams: snapshot.streams.map((s) => ({
             id: s.id,
+            hue: s.hue,
             name: s.name,
             message_size: s.message_size,
             period_ns: s.period_ns,
@@ -140,6 +142,7 @@ function readStream(v: unknown): PersistedStream | null {
     if (!id) return null;
     return {
         id,
+        hue: ((num(v.hue, hueFromId(id)) % 360) + 360) % 360,
         name: str(v.name) ?? id,
         message_size: num(v.message_size, DEFAULT_STREAM.message_size),
         period_ns: num(v.period_ns, DEFAULT_STREAM.period_ns),

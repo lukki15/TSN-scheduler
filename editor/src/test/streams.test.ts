@@ -22,6 +22,13 @@ describe('newStream', () => {
         expect(first.status).toBe('missing-endpoint');
         expect(newStream('s2', [first]).name).toBe('stream2');
     });
+    it('assigns a hue in range, or the given one', () => {
+        const hue = newStream('s', []).hue;
+        expect(hue).toBeGreaterThanOrEqual(0);
+        expect(hue).toBeLessThan(360);
+        expect(Number.isInteger(hue)).toBe(true);
+        expect(newStream('s', [], 42).hue).toBe(42);
+    });
 });
 
 describe('recomputeRoutes', () => {
@@ -94,6 +101,7 @@ describe('buildRouteHighlight', () => {
 
     it('highlights the selected stream route', () => {
         expect(buildRouteHighlight({ kind: 'stream', id: 'ok' }, streams, chain)).toEqual({
+            hue: streams[0].hue,
             nodes: { a: true, b: true, c: true },
             links: { ab: 'forward', cb: 'reverse' },
         });
