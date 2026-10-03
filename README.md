@@ -12,7 +12,9 @@ The workspace is organized as:
 The `editor` folder contains a browser-based network editor (React, TypeScript,
 Vite) for drawing TSN topologies and defining streams across them. It is a
 standalone frontend for now: it keeps its state in the browser and does not yet
-exchange GraphML or `streams.json` files with the Rust crates.
+exchange GraphML or `streams.json` files with the Rust crates. It can play back
+a schedule as animated packets; until the Rust scheduler exists, that schedule
+is mocked in the editor.
 
 ```bash
 cd editor
