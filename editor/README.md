@@ -12,7 +12,7 @@ whose routes are computed over the drawn network.
 - Create **streams** in the top-right panel, pick start and end node, and set `message_size`, `period_ns`, `e2e_latency_ns` and `max_jitter_ns`.
 - A stream's route is the shortest path by hop count. Selecting a stream highlights its route; streams that cannot be routed stay listed with a status badge.
 - Every stream has its own color, used for its row, its route highlight and its packets.
-- **Playback** (bottom-left): Play, Pause and Stop, speed steps 0.5x to 4x, and a clock in µs. While playing, packets move along every routed stream exactly on the drawn links, one transmission per period, hop by hop. Streams sharing a link ride separate lanes.
+- **Playback** (bottom-left): Play, Pause and Stop, speed steps 0.5x to 4x, and a clock in µs. While playing, every routed stream's frames move along the drawn links, one transmission per period, hop by hop. A frame is drawn as a bar from its last bit to its first bit, so a long frame on a short link fills the link while a short frame travels as a short bar. Streams sharing a link ride separate lanes.
 - Everything autosaves to `localStorage` and is restored on reload. Playback always starts stopped at `t = 0`.
 
 ## Schedule (mocked for now)
