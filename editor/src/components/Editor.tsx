@@ -3,6 +3,7 @@ import '@xyflow/react/dist/style.css';
 import { usePersistence } from '../store/usePersistence';
 import { EditorCanvas } from './EditorCanvas';
 import { Sidebar } from './Sidebar';
+import { Inspector } from './inspector/Inspector';
 
 export function Editor() {
     usePersistence();
@@ -13,6 +14,9 @@ export function Editor() {
             <ReactFlowProvider>
                 <Sidebar />
                 <div className="flex-1 h-full relative">
+                    {/* Inspector */}
+                    <Inspector />
+
                     <EditorCanvas />
                 </div>
             </ReactFlowProvider>
