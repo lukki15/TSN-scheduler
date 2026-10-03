@@ -1,16 +1,16 @@
-import {
-    ReactFlow,
-    Background,
-    SelectionMode,
-    useNodesState,
-    useEdgesState,
-    type Edge,
-    type Node,
-} from '@xyflow/react';
+import { useCallback } from 'react';
+import { ReactFlow, Background, SelectionMode, type Viewport } from '@xyflow/react';
+import { useEditorStore } from '../store/editorStore';
+
+const initialViewport = useEditorStore.getState().viewport;
 
 export function EditorCanvas() {
-    const [nodes, , onNodesChange] = useNodesState<Node>([]);
-    const [edges, , onEdgesChange] = useEdgesState<Edge>([]);
+    const nodes = useEditorStore((s) => s.nodes);
+    const edges = useEditorStore((s) => s.edges);
+    const onNodesChange = useEditorStore((s) => s.onNodesChange);
+    const onEdgesChange = useEditorStore((s) => s.onEdgesChange);
+    const setViewport = useEditorStore((s) => s.setViewport);
+    const onMoveEnd = useCallback((_: unknown, viewport: Viewport) => setViewport(viewport), [setViewport]);
 
     return (
         <ReactFlow
@@ -19,7 +19,8 @@ export function EditorCanvas() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+            defaultViewport={initialViewport}
+            onMoveEnd={onMoveEnd}
             defaultEdgeOptions={{ interactionWidth: 20 }}
             selectionMode={SelectionMode.Partial}
             deleteKeyCode={['Backspace', 'Delete']}
