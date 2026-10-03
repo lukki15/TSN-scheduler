@@ -18,6 +18,18 @@ export function indexLinks<L extends GraphLink>(links: readonly L[]): (a: NodeKe
     return (a, b) => byPair.get(pairKey(a, b));
 }
 
+/** User-visible TSN id per node key. A plain record so React selectors can compare it shallowly. */
+export function nodeDisplayIds(nodes: readonly GraphNode[]): Record<NodeKey, string> {
+    return Object.fromEntries(nodes.map((n) => [n.id, n.data.id]));
+}
+
+export const UNKNOWN_NODE_LABEL = '?';
+
+/** TSN id for a node key, `?` for a missing key or an unknown node. */
+export function displayId(ids: Record<NodeKey, string>, key: NodeKey | null | undefined): string {
+    return (key !== null && key !== undefined && ids[key]) || UNKNOWN_NODE_LABEL;
+}
+
 export type ConnectResult =
     | { ok: true }
     | { ok: false; reason: 'self' | 'duplicate' | 'unknown-node' };

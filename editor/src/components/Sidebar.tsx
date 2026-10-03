@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useEditorStore } from '../store/editorStore';
+import { DangerButton } from './inspector/fields';
 import { DRAG_MIME, NODE_TYPES_CONFIG } from './node-types';
 
 export function Sidebar() {
@@ -60,18 +61,15 @@ export function Sidebar() {
                 </div>
 
                 <div className="pt-4 mt-2 border-t border-slate-100">
-                    <button
+                    <DangerButton
                         onClick={onClearClick}
-                        className={`
-                            ${collapsed ? 'w-10 h-10 p-0 justify-center' : 'w-full p-2 px-3'}
-                            ${confirming ? 'bg-red-600 text-white border-red-600 ring-4 ring-red-500/20 animate-pulse' : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'}
-                            border rounded-xl transition-colors text-sm font-bold flex items-center justify-center gap-2
-                        `}
+                        armed={confirming}
+                        className={collapsed ? 'w-10 h-10 p-0' : 'w-full p-2 px-3'}
                         title={confirming ? 'Click again to clear everything' : collapsed ? 'Clear Canvas' : undefined}
                     >
                         <Trash2 size={18} />
                         {!collapsed && <span>{confirming ? 'Click again to confirm' : 'Clear Canvas'}</span>}
-                    </button>
+                    </DangerButton>
                 </div>
             </div>
         </aside>
