@@ -1,6 +1,8 @@
 import { useCallback, useRef } from 'react';
 import { Pause, Play, Square } from 'lucide-react';
-import { SPEEDS, formatSimTime } from '../model/playback';
+import { SPEEDS, formatSimTime, periodIndex } from '../model/playback';
+import { selectedStream } from '../model/streams';
+import { useEditorStore } from '../store/editorStore';
 import { usePlaybackStore } from '../store/playbackStore';
 import { usePlaybackFrame } from './usePlaybackFrame';
 
@@ -20,19 +22,25 @@ export function PlaybackControls() {
     const toggle = usePlaybackStore((s) => s.toggle);
     const stop = usePlaybackStore((s) => s.stop);
     const setSpeed = usePlaybackStore((s) => s.setSpeed);
+    // Period of the selected stream for the clock's period index; 0 when none is selected
+    const selectedPeriodNs = useEditorStore((s) => selectedStream(s.selection, s.streams)?.period_ns ?? 0);
 
     const clockRef = useRef<HTMLSpanElement>(null);
     const lastText = useRef('');
 
     usePlaybackFrame(
-        useCallback((timeNs: number) => {
-            const el = clockRef.current;
-            if (!el) return;
-            const text = formatSimTime(timeNs);
-            if (text === lastText.current) return;
-            lastText.current = text;
-            el.textContent = text;
-        }, []),
+        useCallback(
+            (timeNs: number) => {
+                const el = clockRef.current;
+                if (!el) return;
+                const base = formatSimTime(timeNs);
+                const text = selectedPeriodNs > 0 ? `${base} · #${periodIndex(timeNs, selectedPeriodNs)}` : base;
+                if (text === lastText.current) return;
+                lastText.current = text;
+                el.textContent = text;
+            },
+            [selectedPeriodNs],
+        ),
     );
 
     const isPlaying = status === 'playing';
@@ -73,7 +81,7 @@ export function PlaybackControls() {
             </div>
 
             <div className="px-4 py-2.5 rounded-full shadow-lg border border-slate-200 bg-white/95 backdrop-blur-sm font-mono text-sm font-bold text-slate-700 tabular-nums min-w-[11rem] text-right">
-                <span ref={clockRef}>{formatSimTime(0)}</span>
+                <span ref={clockRef} title="Simulation time · period index of the selected stream">{formatSimTime(0)}</span>
             </div>
         </div>
     );
