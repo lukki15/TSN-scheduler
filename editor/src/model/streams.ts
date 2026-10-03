@@ -1,3 +1,4 @@
+import { randomHue } from './colors';
 import { DEFAULT_STREAM, STREAM_NAME_PREFIX } from './defaults';
 import { buildAdjacency, indexLinks, nextFreeName, pairKey } from './graph';
 import type { RoutingStrategy } from './routing';
@@ -14,10 +15,11 @@ import type {
     StreamId,
 } from './types';
 
-/** A fresh stream with default attributes, no endpoints and the next free name. */
-export function newStream(id: StreamId, existing: readonly Stream[]): Stream {
+/** A fresh stream with default attributes, no endpoints, a random color and the next free name. */
+export function newStream(id: StreamId, existing: readonly Stream[], hue: number = randomHue()): Stream {
     return {
         id,
+        hue,
         name: nextFreeName(existing.map((s) => s.name), STREAM_NAME_PREFIX),
         ...DEFAULT_STREAM,
         start_node: null,
@@ -122,7 +124,7 @@ export function routesUseLinks(streams: readonly Stream[], links: readonly Graph
     });
 }
 
-export const EMPTY_HIGHLIGHT: RouteHighlight = Object.freeze({ nodes: {}, links: {} }) as RouteHighlight;
+export const EMPTY_HIGHLIGHT: RouteHighlight = Object.freeze({ hue: null, nodes: {}, links: {} }) as RouteHighlight;
 
 /** Highlight for the selected stream's route; `EMPTY_HIGHLIGHT` (same reference) when nothing applies. */
 export function buildRouteHighlight(
@@ -133,7 +135,7 @@ export function buildRouteHighlight(
     const stream = selectedStream(selection, streams);
     if (!stream || stream.status !== 'ok') return EMPTY_HIGHLIGHT;
 
-    const highlight: RouteHighlight = { nodes: {}, links: {} };
+    const highlight: RouteHighlight = { hue: stream.hue, nodes: {}, links: {} };
     for (const key of stream.route) highlight.nodes[key] = true;
     for (const { linkId, direction } of routeLinks(stream.route, links)) highlight.links[linkId] = direction;
     return highlight;

@@ -50,6 +50,8 @@ export type RouteStatus = 'ok' | 'missing-endpoint' | 'same-endpoint' | 'unreach
 
 export type Stream = StreamSpec & {
     id: StreamId;
+    /** Display hue 0..359, assigned at creation and persisted. */
+    hue: number;
     /** Computed node path from start to end, empty unless `status === 'ok'`. */
     route: NodeKey[];
     status: RouteStatus;
@@ -72,6 +74,8 @@ export interface GraphLink {
 export type LinkDirection = 'forward' | 'reverse';
 
 export interface RouteHighlight {
+    /** Hue of the highlighted stream, `null` when nothing is highlighted. */
+    hue: number | null;
     nodes: Record<NodeKey, true>;
     /** `'forward'` when the stream travels source → target of the link, else `'reverse'`. */
     links: Record<LinkId, LinkDirection>;

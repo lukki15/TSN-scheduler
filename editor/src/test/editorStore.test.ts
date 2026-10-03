@@ -85,6 +85,8 @@ describe('streams and routes', () => {
         const id = store().addStream();
         expect(store().selection).toEqual({ kind: 'stream', id });
         expect(store().streams[0]).toMatchObject({ name: 'stream1', status: 'missing-endpoint' });
+        expect(store().streams[0].hue).toBeGreaterThanOrEqual(0);
+        expect(store().streams[0].hue).toBeLessThan(360);
         expect(store().routeHighlight).toBe(EMPTY_HIGHLIGHT);
 
         store().updateStream(id, { start_node: a, end_node: c });

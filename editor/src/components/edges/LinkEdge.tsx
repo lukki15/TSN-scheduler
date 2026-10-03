@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
+import { useShallow } from 'zustand/react/shallow';
+import { hueToCss } from '../../model/colors';
 import { UNITS } from '../../model/defaults';
 import { useEditorStore, type EditorLink } from '../../store/editorStore';
 
@@ -23,8 +25,13 @@ export function LinkEdge({
     selected,
 }: EdgeProps<EditorLink>) {
     const [hovered, setHovered] = useState(false);
-    // Primitive selector: undefined unless the selected stream's route uses this link
-    const routeDirection = useEditorStore((s) => s.routeHighlight.links[id]);
+    // Null unless the selected stream's route uses this link; the highlight always carries a hue when it has links
+    const route = useEditorStore(
+        useShallow((s) => {
+            const direction = s.routeHighlight.links[id];
+            return direction ? { direction, hue: s.routeHighlight.hue ?? 0 } : null;
+        }),
+    );
     const [edgePath, labelX, labelY] = getBezierPath({
         sourceX, sourceY, sourcePosition,
         targetX, targetY, targetPosition,
@@ -39,9 +46,9 @@ export function LinkEdge({
                 id={id}
                 path={edgePath}
                 markerEnd={markerEnd}
-                className={routeDirection ? 'link-edge--route' : undefined}
-                style={routeDirection
-                    ? { ...style, stroke: '#4f46e5', strokeDasharray: '8 6', animationDirection: routeDirection === 'reverse' ? 'reverse' : 'normal' }
+                className={route ? 'link-edge--route' : undefined}
+                style={route
+                    ? { ...style, stroke: hueToCss(route.hue), strokeDasharray: '8 6', animationDirection: route.direction === 'reverse' ? 'reverse' : 'normal' }
                     : style}
             />
             {showLabel && (

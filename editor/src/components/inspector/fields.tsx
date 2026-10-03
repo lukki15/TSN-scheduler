@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Trash2 } from 'lucide-react';
+import { hueToCss } from '../../model/colors';
 
 /** Label on the left, boxed control on the right (ArchAlive's "Buffer Capacity" row). */
 export function AttributeRow({ label, children }: { label: string; children: ReactNode }) {
@@ -150,4 +151,9 @@ export function TitleInput({ value, onChange, placeholder, invalid = false }: { 
 /** Small uppercase error line, used in inspector subtitles. */
 export function ErrorText({ children }: { children: ReactNode }) {
     return <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500">{children}</span>;
+}
+
+/** Colour swatch dot for a stream hue. */
+export function HueDot({ hue }: { hue: number }) {
+    return <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" style={{ background: hueToCss(hue) }} />;
 }
