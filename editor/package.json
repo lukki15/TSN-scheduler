@@ -11,8 +11,10 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@pixi/react": "^8.0.5",
     "@xyflow/react": "^12.10.0",
     "lucide-react": "^0.556.0",
+    "pixi.js": "^8.22.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zustand": "^5.0.9"

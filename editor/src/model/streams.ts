@@ -124,6 +124,10 @@ export function routesUseLinks(streams: readonly Stream[], links: readonly Graph
     });
 }
 
+export function hueByStream(streams: readonly Stream[]): Map<StreamId, number> {
+    return new Map(streams.map((s) => [s.id, s.hue]));
+}
+
 export const EMPTY_HIGHLIGHT: RouteHighlight = Object.freeze({ hue: null, nodes: {}, links: {} }) as RouteHighlight;
 
 /** Highlight for the selected stream's route; `EMPTY_HIGHLIGHT` (same reference) when nothing applies. */
