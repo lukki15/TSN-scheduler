@@ -15,3 +15,8 @@ updates:
    directory: "/network-scheduler"
    schedule:
      interval: weekly
+
+ - package-ecosystem: "npm"
+   directory: "/editor"
+   schedule:
+     interval: weekly
