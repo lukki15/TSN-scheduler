@@ -18,6 +18,11 @@ export function indexLinks<L extends GraphLink>(links: readonly L[]): (a: NodeKe
     return (a, b) => byPair.get(pairKey(a, b));
 }
 
+/** `node.id` → `node.source` for every link. */
+export function linkSources(links: readonly GraphLink[]): Map<LinkId, NodeKey> {
+    return new Map(links.map((l) => [l.id, l.source]));
+}
+
 /** User-visible TSN id per node key. A plain record so React selectors can compare it shallowly. */
 export function nodeDisplayIds(nodes: readonly GraphNode[]): Record<NodeKey, string> {
     return Object.fromEntries(nodes.map((n) => [n.id, n.data.id]));
