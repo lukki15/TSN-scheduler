@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_LINK, DEFAULT_PRECISION } from '../model/defaults';
 import { EMPTY_SNAPSHOT, deserialize, serialize } from '../model/persistence';
+import { EMPTY_SCHEDULE } from '../model/schedule';
 import { EMPTY_HIGHLIGHT } from '../model/streams';
 import { dataFromSnapshot, snapshotOf, useEditorStore } from '../store/editorStore';
 
@@ -163,6 +164,63 @@ describe('removals that cannot affect routes', () => {
         store().updateStream(id, { start_node: a, end_node: c });
         store().removeNode(b);
         expect(store().streams[0].status).toBe('unreachable');
+    });
+});
+
+describe('schedule', () => {
+    it('keeps its identity when nothing feeding it changed', () => {
+        const { a, c } = chain();
+        const id = store().addStream();
+        store().updateStream(id, { start_node: a, end_node: c });
+        const before = store().schedule;
+        const linkId = store().edges[0].id;
+
+        store().updateLink(linkId, { length: store().edges[0].data.length }); // no-op patch
+        expect(store().edges).toBe(store().edges);
+        expect(store().schedule).toBe(before);
+
+        store().updateStream(id, { name: 'renamed' }); // not a schedule field
+        expect(store().schedule).toBe(before);
+
+        store().select({ kind: 'node', id: a });
+        expect(store().schedule).toBe(before);
+    });
+
+    it('is empty until a stream is routable', () => {
+        const { a, c } = chain();
+        expect(store().schedule).toBe(EMPTY_SCHEDULE);
+        const id = store().addStream();
+        expect(store().schedule).toBe(EMPTY_SCHEDULE);
+        store().updateStream(id, { start_node: a, end_node: c });
+        expect(store().schedule.streams).toHaveLength(1);
+        expect(store().schedule.streams[0]).toMatchObject({ stream_id: id, period_ns: store().streams[0].period_ns });
+        expect(store().schedule.streams[0].hops).toHaveLength(2);
+    });
+
+    it('reacts to link attribute and topology changes', () => {
+        const { a, c } = chain();
+        const id = store().addStream();
+        store().updateStream(id, { start_node: a, end_node: c });
+        const before = store().schedule.streams[0].hops[0];
+
+        store().updateLink(before.link_id, { bandwidth: 100 });
+        const slower = store().schedule.streams[0].hops[0];
+        expect(slower.tx_end_ns - slower.tx_start_ns).toBe(10 * (before.tx_end_ns - before.tx_start_ns));
+
+        store().removeLink(before.link_id);
+        expect(store().schedule).toBe(EMPTY_SCHEDULE);
+
+        store().clearCanvas();
+        expect(store().schedule).toBe(EMPTY_SCHEDULE);
+    });
+
+    it('is restored from a snapshot', () => {
+        const { a, c } = chain();
+        const id = store().addStream();
+        store().updateStream(id, { start_node: a, end_node: c });
+        const restored = dataFromSnapshot(deserialize(serialize(snapshotOf(store())))!);
+        expect(restored.schedule.streams).toHaveLength(1);
+        expect(restored.schedule.streams[0].hops.map((h) => h.link_id)).toEqual(store().schedule.streams[0].hops.map((h) => h.link_id));
     });
 });
 
