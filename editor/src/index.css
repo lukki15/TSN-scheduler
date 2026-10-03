@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #f0f2f5;
+  color: #202124;
+}
+
+/* Hide default React Flow selection bounding box around groups */
+.react-flow__nodesselection-rect {
+  display: none !important;
+}
+
+/* Remove default React Flow node wrapper styling */
+.react-flow__node {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Connection handle base size — matches previous !w-3/!w-2.5 visual */
+.react-flow__handle {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+}
+
+/* Connection Success Animation: two expanding rings drawn by the pseudo-elements */
+.connection-success-ripple {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+}
+
+.connection-success-ripple::before,
+.connection-success-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 3px solid #22c55e;
+  animation: ripple-expand 0.8s ease-out forwards;
+}
+
+.connection-success-ripple::after {
+  animation-delay: 0.15s;
+}
+
+@keyframes ripple-expand {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+    border-width: 3px;
+  }
+
+  100% {
+    width: 80px;
+    height: 80px;
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* Enhanced Connection Lines - Thicker with subtle glow */
+.react-flow__edge-path {
+  stroke-width: 2px !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+/* Animated Selection Glow */
+@keyframes selection-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15),
+      0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.1),
+      0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* Fix for touch-action on the pane */
+.react-flow__pane {
+  touch-action: none;
+}
