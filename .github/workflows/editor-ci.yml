@@ -1,0 +1,49 @@
+name: Editor CI
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "editor/**"
+      - ".github/workflows/editor-ci.yml"
+  pull_request:
+    paths:
+      - "editor/**"
+      - ".github/workflows/editor-ci.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: editor
+
+jobs:
+  check:
+    name: Lint, typecheck, test and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
