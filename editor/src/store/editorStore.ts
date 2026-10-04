@@ -12,7 +12,7 @@ import {
 import { create } from 'zustand';
 import { DEFAULT_LINK, DEFAULT_PRECISION } from '../model/defaults';
 import { canConnect, isNodeIdAvailable, nextFreeNodeId, pruneDanglingLinks } from '../model/graph';
-import { EMPTY_SNAPSHOT, loadSnapshot, type EditorSnapshot, type StorageLike } from '../model/persistence';
+import { EMPTY_SNAPSHOT, browserStorage, loadSnapshot, type EditorSnapshot } from '../model/persistence';
 import { defaultRouting } from '../model/routing';
 import { EMPTY_SCHEDULE, defaultScheduler, type Schedule } from '../model/schedule';
 import { buildRouteHighlight, newStream, recomputeRoutes, routesTouchNodes, routesUseLinks } from '../model/streams';
@@ -144,14 +144,6 @@ export function snapshotOf(state: EditorData): EditorSnapshot {
         streams: state.streams,
         viewport: state.viewport,
     };
-}
-
-function browserStorage(): StorageLike | undefined {
-    try {
-        return typeof localStorage !== 'undefined' ? localStorage : undefined;
-    } catch {
-        return undefined;
-    }
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
