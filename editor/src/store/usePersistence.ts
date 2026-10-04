@@ -1,16 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { serialize, writeSnapshot, type StorageLike } from '../model/persistence';
+import { browserStorage, serialize, writeSnapshot, type StorageLike } from '../model/persistence';
 import { snapshotOf, useEditorStore } from './editorStore';
 
 const SAVE_DELAY_MS = 500;
-
-function browserStorage(): StorageLike | undefined {
-    try {
-        return typeof localStorage !== 'undefined' ? localStorage : undefined;
-    } catch {
-        return undefined;
-    }
-}
 
 /**
  * Debounced autosave of the editor state. Mirrors ArchAlive's persistence

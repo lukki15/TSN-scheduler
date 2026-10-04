@@ -230,7 +230,7 @@ function renderFrame(scene: Scene, input: FrameInput) {
  * is rendered on demand whenever the editor state, the viewport or the clock
  * changes, so an idle editor costs nothing per frame.
  */
-function PacketTicker() {
+function PacketTicker({ resizeTo }: PacketLayerPixiProps) {
     const { app, isInitialised } = useApplication();
     const flow = useStoreApi<EditorNode, EditorLink>();
     const sceneRef = useRef<Scene | null>(null);
@@ -268,6 +268,20 @@ function PacketTicker() {
         tick();
         app.render();
     }, [app, tick]);
+
+    // Pixi's resizeTo plugin only reacts to window resize events; the wrapper
+    // also changes size when the timeline dock is resized or collapsed. Resizing
+    // clears the canvas, so redraw when the ticker is not running.
+    useEffect(() => {
+        const el = resizeTo.current;
+        if (!isInitialised || !el) return;
+        const observer = new ResizeObserver(() => {
+            app.resize();
+            if (!app.ticker.started) renderOnce();
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [app, isInitialised, resizeTo, renderOnce]);
 
     useEffect(() => {
         if (!isInitialised) return;
@@ -310,7 +324,7 @@ export const PacketLayerPixi = memo(function PacketLayerPixi({ resizeTo }: Packe
             autoDensity
             className="absolute top-0 left-0 z-[50] pointer-events-none"
         >
-            <PacketTicker />
+            <PacketTicker resizeTo={resizeTo} />
         </Application>
     );
 });

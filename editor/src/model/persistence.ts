@@ -94,11 +94,12 @@ export function serialize(snapshot: EditorSnapshot): string {
 
 type Unknown = Record<string, unknown>;
 
-function isRecord(v: unknown): v is Unknown {
+export function isRecord(v: unknown): v is Unknown {
     return typeof v === 'object' && v !== null;
 }
 
-function num(v: unknown, fallback: number): number {
+/** `v` as a finite number (numeric strings accepted), else `fallback`. */
+export function num(v: unknown, fallback: number): number {
     const n = typeof v === 'string' ? Number(v) : v;
     return typeof n === 'number' && Number.isFinite(n) ? n : fallback;
 }
@@ -196,6 +197,15 @@ export function deserialize(raw: string): EditorSnapshot | null {
 
 // ─── Storage access ──────────────────────────────────────────────────────────
 
+/** `localStorage` when available and accessible, otherwise undefined (SSR, tests, blocked storage). */
+export function browserStorage(): StorageLike | undefined {
+    try {
+        return typeof localStorage !== 'undefined' ? localStorage : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * Reads a stored value through `parse`; missing storage, a missing key, a
  * throwing storage or a `parse` returning `null` all yield `fallback`.
@@ -207,6 +217,16 @@ export function readPref<T>(storage: StorageLike | undefined, key: string, parse
         return raw === null ? fallback : (parse(raw) ?? fallback);
     } catch {
         return fallback;
+    }
+}
+
+/** Writes a preference; quota errors and blocked storage are swallowed because a preference is not worth an error. */
+export function writePref(storage: StorageLike | undefined, key: string, value: string): void {
+    if (!storage) return;
+    try {
+        storage.setItem(key, value);
+    } catch {
+        // ignore
     }
 }
 

@@ -6,15 +6,15 @@ import { useEditorStore } from '../store/editorStore';
 import { usePlaybackStore } from '../store/playbackStore';
 import { usePlaybackFrame } from './usePlaybackFrame';
 
-const PILL = 'flex items-center gap-2 px-5 py-2.5 rounded-full shadow-lg border transition-all duration-300';
+const PILL = 'flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm border transition-all duration-300';
 const PILL_IDLE = 'bg-white/95 backdrop-blur-sm text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md hover:text-blue-600';
 const PILL_RESUME = 'bg-white text-green-600 border-green-200 ring-4 ring-green-500/10 shadow-[0_0_20px_rgba(34,197,94,0.15)] animate-pulse';
 
 /**
- * Bottom-left transport controls in the style of ArchAlive's Pause button:
- * Play/Pause, Stop, speed steps and a simulation clock. The clock is written
- * straight into the DOM from the playback frame loop so nothing re-renders per
- * frame.
+ * Transport controls in the style of ArchAlive's Pause button, sized for the
+ * timeline dock toolbar: Play/Pause, Stop, speed steps and a simulation clock.
+ * The clock is written straight into the DOM from the playback frame loop so
+ * nothing re-renders per frame.
  */
 export function PlaybackControls() {
     const status = usePlaybackStore((s) => s.status);
@@ -47,32 +47,32 @@ export function PlaybackControls() {
     const isPaused = status === 'paused';
 
     return (
-        <div className="absolute bottom-4 left-4 z-[150] flex items-center gap-2">
+        <div className="flex items-center gap-2">
             <button
                 onClick={toggle}
                 className={`${PILL} ${isPaused ? PILL_RESUME : PILL_IDLE}`}
                 title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play schedule'}
             >
-                {isPlaying ? <Pause size={16} /> : <Play size={16} className="fill-current" />}
-                <span className="text-sm font-bold">{isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play'}</span>
+                {isPlaying ? <Pause size={14} /> : <Play size={14} className="fill-current" />}
+                <span className="text-xs font-bold">{isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play'}</span>
             </button>
 
             <button
                 onClick={stop}
                 disabled={status === 'stopped'}
-                className={`${PILL} ${PILL_IDLE} !px-3.5 disabled:opacity-50 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-white/95 disabled:hover:shadow-lg`}
+                className={`${PILL} ${PILL_IDLE} !px-2.5 disabled:opacity-50 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-white/95 disabled:hover:shadow-sm`}
                 title="Stop and reset to t = 0"
             >
-                <Square size={16} className="fill-current" />
+                <Square size={14} className="fill-current" />
             </button>
 
-            <div className="flex items-center p-1 rounded-full shadow-lg border border-slate-200 bg-white/95 backdrop-blur-sm">
+            <div className="flex items-center p-0.5 rounded-full shadow-sm border border-slate-200 bg-white/95 backdrop-blur-sm">
                 {SPEEDS.map((s) => (
                     <button
                         key={s}
                         onClick={() => setSpeed(s)}
                         aria-pressed={s === speed}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${s === speed ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${s === speed ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
                         title={`Playback speed ${s}x`}
                     >
                         {s}x
@@ -80,7 +80,7 @@ export function PlaybackControls() {
                 ))}
             </div>
 
-            <div className="px-4 py-2.5 rounded-full shadow-lg border border-slate-200 bg-white/95 backdrop-blur-sm font-mono text-sm font-bold text-slate-700 tabular-nums min-w-[11rem] text-right">
+            <div className="px-3 py-1.5 rounded-full shadow-sm border border-slate-200 bg-white/95 backdrop-blur-sm font-mono text-xs font-bold text-slate-700 tabular-nums min-w-[10rem] text-right">
                 <span ref={clockRef} title="Simulation time · period index of the selected stream">{formatSimTime(0)}</span>
             </div>
         </div>

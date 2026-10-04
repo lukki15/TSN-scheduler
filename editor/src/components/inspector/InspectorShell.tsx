@@ -47,11 +47,14 @@ export function InspectorShell({ icon, title, subtitle, children, defaultWidth =
             const s = start.current;
             const panel = panelRef.current;
             if (!s || !panel) return;
+            const parent = panel.parentElement;
             if (type !== 'vertical') {
-                panel.style.width = `${Math.max(240, Math.min(1000, s.width + (s.x - e.clientX)))}px`;
+                const maxWidth = Math.min(1000, (parent?.clientWidth ?? 1000) - 48);
+                panel.style.width = `${Math.max(240, Math.min(maxWidth, s.width + (s.x - e.clientX)))}px`;
             }
             if (type !== 'horizontal') {
-                panel.style.height = `${Math.max(150, Math.min(window.innerHeight * 0.9, s.height + (s.y - e.clientY)))}px`;
+                const maxHeight = (parent?.clientHeight ?? window.innerHeight) - 48;
+                panel.style.height = `${Math.max(150, Math.min(maxHeight, s.height + (s.y - e.clientY)))}px`;
             }
         },
         onEnd: (type) => {
