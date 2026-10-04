@@ -1,4 +1,5 @@
 import type { Ref } from 'react';
+import type { ScrubHandlers } from './useScrub';
 import { hueToCss } from '../../model/colors';
 import { MAX_INSTANCES_PER_HOP, periodMarkers, type TimelineBar, type TimelineRowGroup } from '../../model/timeline';
 import type { Stream, StreamId } from '../../model/types';
@@ -8,12 +9,14 @@ export interface TimelineRowsProps {
     groups: TimelineRowGroup[];
     windowNs: number;
     width: number;
-    /** The bars area; measured by the dock and shared with the playhead. */
-    areaRef: Ref<HTMLDivElement>;
+    /** Ref callback for the bars area; measured by the dock and shared with the playhead. */
+    attachArea: Ref<HTMLDivElement>;
     hueOf: ReadonlyMap<StreamId, number>;
     /** Emphasised stream; its period boundaries are marked when it is routed. */
     selectedStream: Stream | undefined;
     onBarClick: (bar: TimelineBar) => void;
+    /** Pointer handlers so a press on empty row space seeks. */
+    scrub: ScrubHandlers;
 }
 
 /** Label column on the left, SVG bars on the right; one group of two directional sub-rows per link. */
@@ -21,10 +24,11 @@ export function TimelineRows({
     groups,
     windowNs,
     width,
-    areaRef,
+    attachArea,
     hueOf,
     selectedStream,
     onBarClick,
+    scrub,
 }: TimelineRowsProps) {
     const height = rowsHeight(groups.length);
     const selectedId = selectedStream?.id ?? null;
@@ -47,7 +51,7 @@ export function TimelineRows({
                 </div>
 
                 {/* Bars */}
-                <div ref={areaRef} className="relative flex-1 min-w-0">
+                <div ref={attachArea} {...scrub} className="relative flex-1 min-w-0 touch-none">
                     {width > 0 && (
                         <svg width={width} height={height} className="block">
                             {/* row separators */}
