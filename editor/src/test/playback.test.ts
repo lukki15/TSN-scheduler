@@ -6,6 +6,7 @@ import {
     pause,
     periodIndex,
     play,
+    seek,
     setSpeed,
     stop,
     timeAt,
@@ -45,6 +46,23 @@ describe('playback clock', () => {
         expect(setSpeed(faster, 2, 3000)).toBe(faster);
         const whilePaused = setSpeed(pause(playing, 1000), 0.5, 2000);
         expect(timeAt(whilePaused, 9000)).toBe(500_000);
+    });
+
+    it('seeks while keeping the status, except stopped which becomes paused', () => {
+        const playing = play(INITIAL_PLAYBACK, 0);
+        const sought = seek(playing, 250_000, 1000);
+        expect(sought.status).toBe('playing');
+        expect(timeAt(sought, 1000)).toBe(250_000);
+        expect(timeAt(sought, 2000)).toBe(750_000);
+
+        const paused = seek(pause(playing, 500), 10, 600);
+        expect(paused).toMatchObject({ status: 'paused', anchorTimeNs: 10 });
+
+        const fromStopped = seek(INITIAL_PLAYBACK, 123, 0);
+        expect(fromStopped.status).toBe('paused');
+        expect(timeAt(fromStopped, 99_999)).toBe(123);
+
+        expect(seek(INITIAL_PLAYBACK, -5, 0).anchorTimeNs).toBe(0);
     });
 
     it('stops back to zero', () => {

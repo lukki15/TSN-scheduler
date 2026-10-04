@@ -48,6 +48,17 @@ export function setSpeed(p: Playback, speed: Speed, nowMs: number): Playback {
     return { ...p, speed, anchorTimeNs: timeAt(p, nowMs), anchorWallMs: nowMs };
 }
 
+/**
+ * Jumps to `timeNs` (clamped at 0) and re-anchors at `nowMs`. Playing keeps
+ * playing from the new time; a stopped clock becomes paused so the canvas
+ * renders the frames at that instant instead of nothing.
+ */
+export function seek(p: Playback, timeNs: number, nowMs: number): Playback {
+    const anchorTimeNs = Math.max(0, timeNs);
+    const status: PlaybackStatus = p.status === 'stopped' ? 'paused' : p.status;
+    return { ...p, status, anchorTimeNs, anchorWallMs: nowMs };
+}
+
 /** `t = 1 234.5 µs` with thin-space thousands grouping and one decimal. */
 export function formatSimTime(ns: number): string {
     const us = Math.max(0, ns) / 1000;
