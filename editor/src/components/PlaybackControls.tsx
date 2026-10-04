@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { Pause, Play, Square } from 'lucide-react';
-import { SPEEDS, formatSimTime, periodIndex } from '../model/playback';
+import { SCALE_STEPS_NS_PER_S, formatScale, formatSimTime, periodIndex } from '../model/playback';
 import { selectedStream } from '../model/streams';
 import { useEditorStore } from '../store/editorStore';
 import { usePlaybackStore } from '../store/playbackStore';
@@ -18,10 +18,10 @@ const PILL_RESUME = 'bg-white text-green-600 border-green-200 ring-4 ring-green-
  */
 export function PlaybackControls() {
     const status = usePlaybackStore((s) => s.status);
-    const speed = usePlaybackStore((s) => s.speed);
+    const scale = usePlaybackStore((s) => s.scaleNsPerS);
     const toggle = usePlaybackStore((s) => s.toggle);
     const stop = usePlaybackStore((s) => s.stop);
-    const setSpeed = usePlaybackStore((s) => s.setSpeed);
+    const setScale = usePlaybackStore((s) => s.setScale);
     // Period of the selected stream for the clock's period index; 0 when none is selected
     const selectedPeriodNs = useEditorStore((s) => selectedStream(s.selection, s.streams)?.period_ns ?? 0);
 
@@ -67,15 +67,15 @@ export function PlaybackControls() {
             </button>
 
             <div className="flex items-center p-0.5 rounded-full shadow-sm border border-slate-200 bg-white/95 backdrop-blur-sm">
-                {SPEEDS.map((s) => (
+                {SCALE_STEPS_NS_PER_S.map((s) => (
                     <button
                         key={s}
-                        onClick={() => setSpeed(s)}
-                        aria-pressed={s === speed}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${s === speed ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
-                        title={`Playback speed ${s}x`}
+                        onClick={() => setScale(s)}
+                        aria-pressed={s === scale}
+                        className={`px-2 py-1 rounded-full text-[10px] font-bold transition-colors ${s === scale ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+                        title={`Simulated time per real second: ${formatScale(s)}`}
                     >
-                        {s}x
+                        {formatScale(s)}
                     </button>
                 ))}
             </div>
