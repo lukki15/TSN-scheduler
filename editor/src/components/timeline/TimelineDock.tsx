@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, TriangleAlert } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { DEFAULT_STREAM } from '../../model/defaults';
@@ -12,8 +12,10 @@ import { PlaybackControls } from '../PlaybackControls';
 import { IdleLinksRow } from './IdleLinksRow';
 import { TimelineRows } from './TimelineRows';
 import { TimelineRuler } from './TimelineRuler';
+import { Playhead } from './Playhead';
+import { useScrub } from './useScrub';
 import { LABEL_WIDTH } from './geometry';
-import { useMeasuredWidth } from './useMeasuredWidth';
+import { useElementWidth } from './useMeasuredWidth';
 
 /**
  * Bottom dock under the canvas, in the ArchAlive glass style: a toolbar row
@@ -37,7 +39,8 @@ export function TimelineDock() {
     const setDockHeight = useUiStore((s) => s.setDockHeight);
 
     const sectionRef = useRef<HTMLElement>(null);
-    const area = useMeasuredWidth<HTMLDivElement>();
+    // The bars area is tracked as state (not a ref) because its width is needed during render.
+    const [areaElement, attachArea] = useState<HTMLDivElement | null>(null);
     const dragStart = useRef<{ y: number; height: number } | null>(null);
 
     const window_ = useMemo(() => hyperperiod(schedule), [schedule]);
@@ -47,7 +50,8 @@ export function TimelineDock() {
     const visibleGroups = showIdleLinks ? groups : groups.filter((g) => !g.idle);
     const hueOf = useMemo(() => hueByStream(streams), [streams]);
     const selectedStream = selectedStreamOf(selection, streams);
-    const width = area.width;
+    const width = useElementWidth(areaElement);
+    const scrub = useScrub(areaElement, windowNs);
 
     const resize = usePointerDrag<null>({
         cursor: 'ns-resize',
@@ -122,29 +126,38 @@ export function TimelineDock() {
                         </div>
                     ) : (
                         <>
-                            {/* Ruler, offset by the label column */}
-                            <div className="shrink-0 flex border-b border-slate-100">
-                                <div className="shrink-0 border-r border-slate-100" style={{ width: LABEL_WIDTH }} />
-                                <div className="flex-1 min-w-0">
-                                    <TimelineRuler windowNs={windowNs} width={width} />
+                            {/* Ruler + rows share the playhead overlay; the idle footer sits below it */}
+                            <div className="relative flex-1 min-h-0 flex flex-col">
+                                {/* Ruler, offset by the label column */}
+                                <div className="shrink-0 flex border-b border-slate-100">
+                                    <div className="shrink-0 border-r border-slate-100" style={{ width: LABEL_WIDTH }} />
+                                    <div {...scrub} className="flex-1 min-w-0 cursor-pointer touch-none">
+                                        <TimelineRuler windowNs={windowNs} width={width} />
+                                    </div>
                                 </div>
-                            </div>
 
-                            {visibleGroups.length === 0 ? (
-                                <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
-                                    No scheduled traffic. Add a stream with a start and end node.
-                                </div>
-                            ) : (
-                                <TimelineRows
-                                    groups={visibleGroups}
-                                    windowNs={windowNs}
-                                    width={width}
-                                    areaRef={area.ref}
-                                    hueOf={hueOf}
-                                    selectedStream={selectedStream}
-                                    onBarClick={(bar: TimelineBar) => select({ kind: 'stream', id: bar.streamId })}
-                                />
-                            )}
+                                {visibleGroups.length === 0 ? (
+                                    <div className="flex-1 flex">
+                                        <div className="shrink-0 border-r border-slate-100" style={{ width: LABEL_WIDTH }} />
+                                        <div ref={attachArea} {...scrub} className="flex-1 flex items-center justify-center text-xs text-slate-400 touch-none">
+                                            No scheduled traffic. Add a stream with a start and end node.
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <TimelineRows
+                                        groups={visibleGroups}
+                                        windowNs={windowNs}
+                                        width={width}
+                                        attachArea={attachArea}
+                                        hueOf={hueOf}
+                                        selectedStream={selectedStream}
+                                        onBarClick={(bar: TimelineBar) => select({ kind: 'stream', id: bar.streamId })}
+                                        scrub={scrub}
+                                    />
+                                )}
+
+                                <Playhead windowNs={windowNs} width={width} scrub={scrub} />
+                            </div>
 
                             <IdleLinksRow idleGroups={idleGroups} shown={showIdleLinks} onToggle={toggleShowIdleLinks} />
                         </>

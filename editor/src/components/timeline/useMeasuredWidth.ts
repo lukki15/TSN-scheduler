@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react';
 
-export interface MeasuredElement<T extends HTMLElement> {
-    /** Attach as `ref` to the element to measure; works for elements that mount later. */
-    ref: (el: T | null) => void;
-    element: T | null;
-    /** Content width in px, 0 until measured. */
-    width: number;
-}
-
-/** Tracks an element and its content width with a ResizeObserver. */
-export function useMeasuredWidth<T extends HTMLElement = HTMLDivElement>(): MeasuredElement<T> {
-    const [element, setElement] = useState<T | null>(null);
+/** Content width of `element` in px, kept current with a ResizeObserver (0 until measured or while null). */
+export function useElementWidth(element: HTMLElement | null): number {
     const [width, setWidth] = useState(0);
 
     useEffect(() => {
@@ -22,5 +13,5 @@ export function useMeasuredWidth<T extends HTMLElement = HTMLDivElement>(): Meas
         return () => observer.disconnect();
     }, [element]);
 
-    return { ref: setElement, element, width };
+    return element ? width : 0;
 }
