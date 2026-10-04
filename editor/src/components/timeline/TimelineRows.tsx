@@ -2,8 +2,14 @@ import type { Ref } from 'react';
 import type { ScrubHandlers } from './useScrub';
 import { hueToCss } from '../../model/colors';
 import { MAX_INSTANCES_PER_HOP, periodMarkers, type TimelineBar, type TimelineRowGroup } from '../../model/timeline';
-import type { Stream, StreamId } from '../../model/types';
+import type { LinkId, Stream, StreamId } from '../../model/types';
 import { BAR_PAD, GROUP_HEIGHT, LABEL_WIDTH, MIN_BAR_PX, SUB_ROW_HEIGHT, groupTop, rowsHeight, xOf } from './geometry';
+
+export interface BarHover {
+    bar: TimelineBar;
+    /** Screen rect of the hovered bar. */
+    anchor: DOMRect;
+}
 
 export interface TimelineRowsProps {
     groups: TimelineRowGroup[];
@@ -15,6 +21,10 @@ export interface TimelineRowsProps {
     /** Emphasised stream; its period boundaries are marked when it is routed. */
     selectedStream: Stream | undefined;
     onBarClick: (bar: TimelineBar) => void;
+    /** Hovered bar, or null when the pointer leaves. */
+    onBarHover: (hover: BarHover | null) => void;
+    /** Hovered link row group, or null. */
+    onGroupHover: (linkId: LinkId | null) => void;
     /** Pointer handlers so a press on empty row space seeks. */
     scrub: ScrubHandlers;
 }
@@ -28,6 +38,8 @@ export function TimelineRows({
     hueOf,
     selectedStream,
     onBarClick,
+    onBarHover,
+    onGroupHover,
     scrub,
 }: TimelineRowsProps) {
     const height = rowsHeight(groups.length);
@@ -35,12 +47,23 @@ export function TimelineRows({
     const marker = selectedStream?.status === 'ok' ? { hue: selectedStream.hue, ns: periodMarkers(selectedStream.period_ns, windowNs) } : null;
 
     return (
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+            onScroll={() => onBarHover(null)}
+            onMouseLeave={() => onBarHover(null)}
+        >
             <div className="flex" style={{ height }}>
                 {/* Label column */}
                 <div className="shrink-0 border-r border-slate-100" style={{ width: LABEL_WIDTH }}>
                     {groups.map((group) => (
-                        <div key={group.linkId} className="px-3 flex flex-col justify-center" style={{ height: GROUP_HEIGHT }} title={group.label}>
+                        <div
+                            key={group.linkId}
+                            className="px-3 flex flex-col justify-center hover:bg-slate-50 transition-colors"
+                            style={{ height: GROUP_HEIGHT }}
+                            title={group.label}
+                            onMouseEnter={() => onGroupHover(group.linkId)}
+                            onMouseLeave={() => onGroupHover(null)}
+                        >
                             <div className="text-[10px] font-bold text-slate-600 font-mono truncate leading-4">{group.label}</div>
                             <div className="flex flex-col text-[9px] text-slate-400 font-mono leading-[12px]">
                                 <span className="truncate">{group.rows[0].label}</span>
@@ -54,9 +77,20 @@ export function TimelineRows({
                 <div ref={attachArea} {...scrub} className="relative flex-1 min-w-0 touch-none">
                     {width > 0 && (
                         <svg width={width} height={height} className="block">
-                            {/* row separators */}
+                            {/* row separators and hover hit areas */}
                             {groups.map((group, i) => (
-                                <line key={group.linkId} x1={0} x2={width} y1={(i + 1) * GROUP_HEIGHT - 0.5} y2={(i + 1) * GROUP_HEIGHT - 0.5} className="stroke-slate-100" />
+                                <g key={group.linkId}>
+                                    <rect
+                                        x={0}
+                                        y={i * GROUP_HEIGHT}
+                                        width={width}
+                                        height={GROUP_HEIGHT}
+                                        className="fill-transparent hover:fill-slate-50"
+                                        onMouseEnter={() => onGroupHover(group.linkId)}
+                                        onMouseLeave={() => onGroupHover(null)}
+                                    />
+                                    <line x1={0} x2={width} y1={(i + 1) * GROUP_HEIGHT - 0.5} y2={(i + 1) * GROUP_HEIGHT - 0.5} className="stroke-slate-100" />
+                                </g>
                             ))}
 
                             {/* period markers of the selected stream */}
@@ -85,6 +119,11 @@ export function TimelineRows({
                                                 className="cursor-pointer"
                                                 onClick={() => onBarClick(bar)}
                                                 onPointerDown={(e) => e.stopPropagation()}
+                                                onMouseEnter={(e) => {
+                                                    onGroupHover(group.linkId);
+                                                    onBarHover({ bar, anchor: e.currentTarget.getBoundingClientRect() });
+                                                }}
+                                                onMouseLeave={() => onBarHover(null)}
                                             >
                                                 {/* transmission */}
                                                 <rect
