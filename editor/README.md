@@ -12,7 +12,7 @@ whose routes are computed over the drawn network.
 - Create **streams** in the top-right panel, pick start and end node, and set `message_size`, `period_ns`, `e2e_latency_ns` and `max_jitter_ns`.
 - A stream's route is the shortest path by hop count. Selecting a stream highlights its route; streams that cannot be routed stay listed with a status badge.
 - Every stream has its own color, used for its row, its route highlight and its packets.
-- **Playback** (bottom-left): Play, Pause and Stop, speed steps 0.5x to 4x, and a clock in µs. While playing, every routed stream's frames move along the drawn links, one transmission per period, hop by hop. A frame is drawn as a bar from its last bit to its first bit, so a long frame on a short link fills the link while a short frame travels as a short bar. Streams sharing a link ride separate lanes.
+- **Playback** (timeline toolbar): Play, Pause and Stop, an exponential speed dial from 5 µs/s to 5 ms/s, and a clock in µs. While playing, every routed stream's frames move along the drawn links, one transmission per period, hop by hop. A frame is drawn as a bar from its last bit to its first bit, so a long frame on a short link fills the link while a short frame travels as a short bar. Streams sharing a link ride separate lanes.
 - **Timeline dock** under the canvas: one row group per link with a sub-row per direction, bars for every transmission over one hyperperiod (solid while sending, lighter while the bits are still on the wire). A playhead follows the clock and can be dragged to scrub; clicking the ruler jumps. Hovering a row highlights the link on the canvas, hovering a bar shows its times, clicking a bar selects the stream. Links without traffic collapse into a footer line. The dock collapses and resizes; its size is remembered.
 - Everything autosaves to `localStorage` and is restored on reload. Playback always starts stopped at `t = 0`.
 
@@ -25,7 +25,10 @@ spreads streams across their period and chains hops store-and-forward using
 `message_size / bandwidth` for transmission and `5 ns/m × length` for
 propagation. Timing correctness is not the point yet; the UI is.
 
-Playback runs in slow motion: 1 ms of simulated time takes 2 s at 1x.
+Playback runs in slow motion. The speed dial sets how much simulated time passes
+per real second, on 1-2-5 steps from 5 µs/s (a 1 kB frame on 1 Gbit/s, 8 µs on
+the wire, takes 1.6 s to cross) to 5 ms/s (a 64 kB frame on 100 Mbit/s, about
+5 ms, crosses in 1 s). The default is 500 µs/s and the last choice is remembered.
 
 The timeline shows one **hyperperiod**, the least common multiple of all stream
 periods, and the playhead wraps around it. When that multiple would exceed 64
@@ -78,7 +81,7 @@ default can be swapped for another algorithm without UI changes.
 | Select | click node, link or stream row |
 | Delete | select, then Delete or Backspace |
 | Play / Pause / Stop | timeline toolbar; Stop resets to t = 0 |
-| Speed | 0.5x, 1x, 2x, 4x next to the transport buttons |
+| Speed | drag the dial or use arrow keys while it is focused; 5 µs/s to 5 ms/s |
 | Seek | drag the playhead handle, or click / drag on the ruler or empty row space |
 | Timeline size | drag the dock's top edge; chevron collapses it to the toolbar |
 | Idle links | "show" / "hide" in the footer line of the timeline |
