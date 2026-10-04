@@ -13,6 +13,8 @@ export const HYPERPERIOD_CAP_FACTOR = 64;
 export const MAX_INSTANCES_PER_HOP = 256;
 /** Stacked lanes per sub-row; further overlapping bars share the last lane. */
 export const MAX_LANES = 4;
+/** Period markers drawn for the selected stream; guards tiny periods inside a long window. */
+export const MAX_PERIOD_MARKERS = 256;
 
 export interface TimelineWindow {
     /** 0 when no stream has a positive period. */
@@ -178,6 +180,14 @@ export function buildTimelineRows(
         group.idle = group.rows[0].bars.length === 0 && group.rows[1].bars.length === 0;
     }
     return [...groups.values()];
+}
+
+/** Window positions of the period boundaries of a stream (excluding 0 and the window end). */
+export function periodMarkers(periodNs: number, windowNs: number): number[] {
+    const markers: number[] = [];
+    if (periodNs <= 0 || windowNs <= 0) return markers;
+    for (let ns = periodNs; ns < windowNs && markers.length < MAX_PERIOD_MARKERS; ns += periodNs) markers.push(ns);
+    return markers;
 }
 
 // ─── Ruler ───────────────────────────────────────────────────────────────────
