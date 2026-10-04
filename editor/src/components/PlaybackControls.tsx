@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
-import { Pause, Play, Square } from 'lucide-react';
-import { SCALE_STEPS_NS_PER_S, formatScale, formatSimTime, periodIndex } from '../model/playback';
+import { Gauge, Pause, Play, Square } from 'lucide-react';
+import { SCALE_STEPS_NS_PER_S, formatScale, formatSimTime, periodIndex, scaleIndex } from '../model/playback';
 import { selectedStream } from '../model/streams';
 import { useEditorStore } from '../store/editorStore';
 import { usePlaybackStore } from '../store/playbackStore';
@@ -66,18 +66,24 @@ export function PlaybackControls() {
                 <Square size={14} className="fill-current" />
             </button>
 
-            <div className="flex items-center p-0.5 rounded-full shadow-sm border border-slate-200 bg-white/95 backdrop-blur-sm">
-                {SCALE_STEPS_NS_PER_S.map((s) => (
-                    <button
-                        key={s}
-                        onClick={() => setScale(s)}
-                        aria-pressed={s === scale}
-                        className={`px-2 py-1 rounded-full text-[10px] font-bold transition-colors ${s === scale ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
-                        title={`Simulated time per real second: ${formatScale(s)}`}
-                    >
-                        {formatScale(s)}
-                    </button>
-                ))}
+            {/* Exponential speed dial: simulated time per real second, snapping to 1-2-5 steps */}
+            <div
+                className="flex items-center gap-2 px-3 py-1 rounded-full shadow-sm border border-slate-200 bg-white/95 backdrop-blur-sm"
+                title="Playback speed: simulated time per real second"
+            >
+                <Gauge size={14} className="text-slate-400" />
+                <input
+                    type="range"
+                    min={0}
+                    max={SCALE_STEPS_NS_PER_S.length - 1}
+                    step={1}
+                    value={scaleIndex(scale)}
+                    onChange={(e) => setScale(SCALE_STEPS_NS_PER_S[Number(e.target.value)])}
+                    aria-label="Playback speed"
+                    aria-valuetext={formatScale(scale)}
+                    className="w-24 h-1.5 accent-indigo-600 cursor-pointer"
+                />
+                <span className="font-mono text-[10px] font-bold text-slate-600 tabular-nums min-w-[4.5rem] text-right">{formatScale(scale)}</span>
             </div>
 
             <div className="px-3 py-1.5 rounded-full shadow-sm border border-slate-200 bg-white/95 backdrop-blur-sm font-mono text-xs font-bold text-slate-700 tabular-nums min-w-[10rem] text-right">
