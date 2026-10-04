@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { hueToCss } from '../../model/colors';
 import { UNITS } from '../../model/defaults';
 import { useEditorStore, type EditorLink } from '../../store/editorStore';
+import { useUiStore } from '../../store/uiStore';
 
 /**
  * Undirected link. Ported from ArchAlive's LatencyEdge (plain bezier BaseEdge)
@@ -32,13 +33,15 @@ export function LinkEdge({
             return direction ? { direction, hue: s.routeHighlight.hue ?? 0 } : null;
         }),
     );
+    // Hovered in the timeline dock: thicken on the canvas and show the label
+    const hoveredInTimeline = useUiStore((s) => s.hoveredLinkId === id);
     const [edgePath, labelX, labelY] = getBezierPath({
         sourceX, sourceY, sourcePosition,
         targetX, targetY, targetPosition,
     });
 
     const { length, bandwidth } = data;
-    const showLabel = hovered || selected;
+    const showLabel = hovered || selected || hoveredInTimeline;
 
     return (
         <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
@@ -46,7 +49,7 @@ export function LinkEdge({
                 id={id}
                 path={edgePath}
                 markerEnd={markerEnd}
-                className={route ? 'link-edge--route' : undefined}
+                className={route ? 'link-edge--route' : hoveredInTimeline ? 'link-edge--hover' : undefined}
                 style={route
                     ? { ...style, stroke: hueToCss(route.hue), strokeDasharray: '8 6', animationDirection: route.direction === 'reverse' ? 'reverse' : 'normal' }
                     : style}

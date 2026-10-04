@@ -1,16 +1,17 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, TriangleAlert } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { DEFAULT_STREAM } from '../../model/defaults';
-import { nodeDisplayIds } from '../../model/graph';
+import { displayId, nodeDisplayIds } from '../../model/graph';
 import { hueByStream, selectedStream as selectedStreamOf } from '../../model/streams';
 import { HYPERPERIOD_CAP_FACTOR, buildTimelineRows, formatUs, hyperperiod, type TimelineBar } from '../../model/timeline';
 import { useEditorStore } from '../../store/editorStore';
 import { clampDockHeight, useUiStore } from '../../store/uiStore';
 import { usePointerDrag } from '../usePointerDrag';
 import { PlaybackControls } from '../PlaybackControls';
+import { BarTooltip } from './BarTooltip';
 import { IdleLinksRow } from './IdleLinksRow';
-import { TimelineRows } from './TimelineRows';
+import { TimelineRows, type BarHover } from './TimelineRows';
 import { TimelineRuler } from './TimelineRuler';
 import { Playhead } from './Playhead';
 import { useScrub } from './useScrub';
@@ -37,6 +38,11 @@ export function TimelineDock() {
     const toggleCollapsed = useUiStore((s) => s.toggleDockCollapsed);
     const toggleShowIdleLinks = useUiStore((s) => s.toggleShowIdleLinks);
     const setDockHeight = useUiStore((s) => s.setDockHeight);
+    const setHoveredLink = useUiStore((s) => s.setHoveredLink);
+    const [hoverBar, setHoverBar] = useState<BarHover | null>(null);
+
+    // Never leave a canvas edge highlighted when the dock goes away
+    useEffect(() => () => setHoveredLink(null), [setHoveredLink]);
 
     const sectionRef = useRef<HTMLElement>(null);
     // The bars area is tracked as state (not a ref) because its width is needed during render.
@@ -71,6 +77,12 @@ export function TimelineDock() {
             if (sectionRef.current) setDockHeight(sectionRef.current.getBoundingClientRect().height);
         },
     });
+
+    // The tooltip follows a bar element; once that bar is gone (schedule change,
+    // stream removed, row hidden) no mouseleave fires, so check it still exists.
+    const hoverVisible =
+        hoverBar !== null && visibleGroups.some((g) => g.rows.some((r) => r.bars.some((b) => b.key === hoverBar.bar.key)));
+    const hoverStream = hoverBar && hoverVisible ? streams.find((s) => s.id === hoverBar.bar.streamId) : undefined;
 
     return (
         <section
@@ -117,6 +129,16 @@ export function TimelineDock() {
                 </div>
             </div>
 
+            {hoverBar && hoverStream && (
+                <BarTooltip
+                    bar={hoverBar.bar}
+                    anchor={hoverBar.anchor}
+                    streamName={hoverStream.name}
+                    hue={hoverStream.hue}
+                    hopLabel={`${displayId(nodeIds, hoverBar.bar.hop.from)} → ${displayId(nodeIds, hoverBar.bar.hop.to)}`}
+                />
+            )}
+
             {/* Body */}
             {!collapsed && (
                 <div className="relative flex-1 min-h-0 flex flex-col">
@@ -152,6 +174,8 @@ export function TimelineDock() {
                                         hueOf={hueOf}
                                         selectedStream={selectedStream}
                                         onBarClick={(bar: TimelineBar) => select({ kind: 'stream', id: bar.streamId })}
+                                        onBarHover={setHoverBar}
+                                        onGroupHover={setHoveredLink}
                                         scrub={scrub}
                                     />
                                 )}

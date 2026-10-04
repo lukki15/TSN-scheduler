@@ -127,3 +127,9 @@ body {
     stroke-dashoffset: -28;
   }
 }
+
+/* Link hovered in the timeline dock */
+.react-flow__edge-path.link-edge--hover {
+  stroke: #4f46e5 !important;
+  stroke-width: 4px !important;
+}
