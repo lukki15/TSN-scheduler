@@ -1,11 +1,19 @@
 import { useMemo, useRef } from 'react';
 import { ChevronDown, ChevronUp, TriangleAlert } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { DEFAULT_STREAM } from '../../model/defaults';
-import { HYPERPERIOD_CAP_FACTOR, formatUs, hyperperiod } from '../../model/timeline';
+import { nodeDisplayIds } from '../../model/graph';
+import { hueByStream, selectedStream as selectedStreamOf } from '../../model/streams';
+import { HYPERPERIOD_CAP_FACTOR, buildTimelineRows, formatUs, hyperperiod, type TimelineBar } from '../../model/timeline';
 import { useEditorStore } from '../../store/editorStore';
 import { clampDockHeight, useUiStore } from '../../store/uiStore';
 import { usePointerDrag } from '../usePointerDrag';
 import { PlaybackControls } from '../PlaybackControls';
+import { IdleLinksRow } from './IdleLinksRow';
+import { TimelineRows } from './TimelineRows';
+import { TimelineRuler } from './TimelineRuler';
+import { LABEL_WIDTH } from './geometry';
+import { useMeasuredWidth } from './useMeasuredWidth';
 
 /**
  * Bottom dock under the canvas, in the ArchAlive glass style: a toolbar row
@@ -16,16 +24,30 @@ import { PlaybackControls } from '../PlaybackControls';
 export function TimelineDock() {
     const schedule = useEditorStore((s) => s.schedule);
     const edges = useEditorStore((s) => s.edges);
+    // Only the display ids: a shallow-compared record so node drags do not rebuild the rows
+    const nodeIds = useEditorStore(useShallow((s) => nodeDisplayIds(s.nodes)));
+    const streams = useEditorStore((s) => s.streams);
+    const selection = useEditorStore((s) => s.selection);
+    const select = useEditorStore((s) => s.select);
     const collapsed = useUiStore((s) => s.dockCollapsed);
     const height = useUiStore((s) => s.dockHeight);
+    const showIdleLinks = useUiStore((s) => s.showIdleLinks);
     const toggleCollapsed = useUiStore((s) => s.toggleDockCollapsed);
+    const toggleShowIdleLinks = useUiStore((s) => s.toggleShowIdleLinks);
     const setDockHeight = useUiStore((s) => s.setDockHeight);
 
     const sectionRef = useRef<HTMLElement>(null);
+    const area = useMeasuredWidth<HTMLDivElement>();
     const dragStart = useRef<{ y: number; height: number } | null>(null);
 
     const window_ = useMemo(() => hyperperiod(schedule), [schedule]);
     const windowNs = window_.windowNs || DEFAULT_STREAM.period_ns;
+    const groups = useMemo(() => buildTimelineRows(schedule, edges, nodeIds, windowNs), [schedule, edges, nodeIds, windowNs]);
+    const idleGroups = groups.filter((g) => g.idle);
+    const visibleGroups = showIdleLinks ? groups : groups.filter((g) => !g.idle);
+    const hueOf = useMemo(() => hueByStream(streams), [streams]);
+    const selectedStream = selectedStreamOf(selection, streams);
+    const width = area.width;
 
     const resize = usePointerDrag<null>({
         cursor: 'ns-resize',
@@ -94,10 +116,38 @@ export function TimelineDock() {
             {/* Body */}
             {!collapsed && (
                 <div className="relative flex-1 min-h-0 flex flex-col">
-                    {edges.length === 0 && (
+                    {edges.length === 0 ? (
                         <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
                             Add links and streams to see the schedule
                         </div>
+                    ) : (
+                        <>
+                            {/* Ruler, offset by the label column */}
+                            <div className="shrink-0 flex border-b border-slate-100">
+                                <div className="shrink-0 border-r border-slate-100" style={{ width: LABEL_WIDTH }} />
+                                <div className="flex-1 min-w-0">
+                                    <TimelineRuler windowNs={windowNs} width={width} />
+                                </div>
+                            </div>
+
+                            {visibleGroups.length === 0 ? (
+                                <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
+                                    No scheduled traffic. Add a stream with a start and end node.
+                                </div>
+                            ) : (
+                                <TimelineRows
+                                    groups={visibleGroups}
+                                    windowNs={windowNs}
+                                    width={width}
+                                    areaRef={area.ref}
+                                    hueOf={hueOf}
+                                    selectedStream={selectedStream}
+                                    onBarClick={(bar: TimelineBar) => select({ kind: 'stream', id: bar.streamId })}
+                                />
+                            )}
+
+                            <IdleLinksRow idleGroups={idleGroups} shown={showIdleLinks} onToggle={toggleShowIdleLinks} />
+                        </>
                     )}
                 </div>
             )}
