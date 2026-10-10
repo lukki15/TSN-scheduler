@@ -17,6 +17,7 @@
     "pixi.js": "^8.22.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "scheduler-wasm": "file:../network-scheduler/crates/scheduler-wasm/pkg",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
@@ -29,6 +30,7 @@
     "@xyflow/system": "^0.0.83",
     "autoprefixer": "^10.4.22",
     "eslint": "^10.12.0",
+    "vite-plugin-wasm": "^3.0.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",

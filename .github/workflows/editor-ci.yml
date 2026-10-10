@@ -5,10 +5,12 @@ on:
     branches: ["**"]
     paths:
       - "editor/**"
+      - "network-scheduler/**"
       - ".github/workflows/editor-ci.yml"
   pull_request:
     paths:
       - "editor/**"
+      - "network-scheduler/**"
       - ".github/workflows/editor-ci.yml"
 
 permissions:
@@ -32,6 +34,19 @@ jobs:
           node-version: lts/*
           cache: npm
           cache-dependency-path: editor/package-lock.json
+
+      - name: Setup Rust
+        uses: ./.github/actions/rust-setup
+        with:
+          working-directory: network-scheduler
+          rust-target: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build scheduler-wasm package
+        working-directory: network-scheduler/crates/scheduler-wasm
+        run: wasm-pack build --target web --out-dir pkg
 
       - name: Install dependencies
         run: npm ci
