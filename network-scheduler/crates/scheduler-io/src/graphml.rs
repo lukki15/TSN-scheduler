@@ -83,7 +83,7 @@ impl GraphMl {
             match reader.read_event_into(&mut buf)? {
                 Event::Start(e) => {
                     let name_buf = e.name();
-                    let name = local_name(name_buf.as_ref());
+                    let name = local_name(name_buf.as_ref().as_bytes());
 
                     match name {
                         b"graph" => {
@@ -153,7 +153,7 @@ impl GraphMl {
 
                 Event::Empty(e) => {
                     let name_buf = e.name();
-                    let name = local_name(name_buf.as_ref());
+                    let name = local_name(name_buf.as_ref().as_bytes());
 
                     match name {
                         b"node" => {
@@ -229,19 +229,19 @@ impl GraphMl {
                 Event::Text(e) => {
                     if current_data_key.is_some() {
                         current_data_value
-                            .push_str(&e.decode().map_err(|e| GraphMlError::Xml(e.into()))?);
+                            .push_str(&e.xml_content(quick_xml::XmlVersion::Explicit1_0));
                     }
                 }
 
                 Event::CData(e) => {
                     if current_data_key.is_some() {
-                        current_data_value.push_str(&String::from_utf8_lossy(e.as_ref()));
+                        current_data_value.push_str(e.as_ref());
                     }
                 }
 
                 Event::End(e) => {
                     let name_buf = e.name();
-                    let name = local_name(name_buf.as_ref());
+                    let name = local_name(name_buf.as_ref().as_bytes());
 
                     match name {
                         b"data" => {
@@ -394,19 +394,16 @@ fn local_name(name: &[u8]) -> &[u8] {
 }
 
 fn get_attr<R: BufRead>(
-    reader: &Reader<R>,
+    _reader: &Reader<R>,
     element: &BytesStart<'_>,
     wanted: &[u8],
 ) -> Result<Option<String>, GraphMlError> {
     for attr in element.attributes().with_checks(false) {
         let attr = attr.map_err(|err| GraphMlError::Xml(err.into()))?;
-        if local_name(attr.key.as_ref()) == wanted {
+        if local_name(attr.key.as_ref().as_bytes()) == wanted {
             return Ok(Some(
-                attr.decoded_and_normalized_value(
-                    quick_xml::XmlVersion::Explicit1_0,
-                    reader.decoder(),
-                )?
-                .into_owned(),
+                attr.normalized_value(quick_xml::XmlVersion::Explicit1_0)?
+                    .into_owned(),
             ));
         }
     }
