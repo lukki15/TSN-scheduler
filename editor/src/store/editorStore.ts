@@ -14,8 +14,9 @@ import { DEFAULT_LINK, DEFAULT_PRECISION } from '../model/defaults';
 import { canConnect, isNodeIdAvailable, nextFreeNodeId, pruneDanglingLinks } from '../model/graph';
 import { EMPTY_SNAPSHOT, browserStorage, loadSnapshot, type EditorSnapshot } from '../model/persistence';
 import { defaultRouting } from '../model/routing';
-import { EMPTY_SCHEDULE, defaultScheduler, type Schedule } from '../model/schedule';
+import { EMPTY_SCHEDULE, type Schedule } from '../model/schedule';
 import { buildRouteHighlight, newStream, recomputeRoutes, routesTouchNodes, routesUseLinks } from '../model/streams';
+import { runSchedulerWasm } from '../simulation/wasm';
 import type {
     EdgeData,
     LinkId,
@@ -78,8 +79,21 @@ let lastSchedule: { streams: Stream[]; edges: EditorLink[]; schedule: Schedule }
 
 function scheduleFor(streams: Stream[], edges: EditorLink[]): Schedule {
     if (lastSchedule && lastSchedule.streams === streams && lastSchedule.edges === edges) return lastSchedule.schedule;
-    const schedule = streams.length === 0 ? EMPTY_SCHEDULE : defaultScheduler.schedule(streams, edges);
+
+    const schedule = EMPTY_SCHEDULE;
     lastSchedule = { streams, edges, schedule };
+
+    if (streams.length > 0) {
+        void runSchedulerWasm(streams, edges).then((wasmSchedule) => {
+            if (!lastSchedule || lastSchedule.streams !== streams || lastSchedule.edges !== edges) return;
+            lastSchedule.schedule = wasmSchedule;
+            const state = useEditorStore.getState();
+            if (state.streams === streams && state.edges === edges) {
+                useEditorStore.setState({ schedule: wasmSchedule });
+            }
+        });
+    }
+
     return schedule;
 }
 

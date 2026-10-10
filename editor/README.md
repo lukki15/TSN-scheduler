@@ -16,14 +16,12 @@ whose routes are computed over the drawn network.
 - **Timeline dock** under the canvas: one row group per link with a sub-row per direction, bars for every transmission over one hyperperiod (solid while sending, lighter while the bits are still on the wire). A playhead follows the clock and can be dragged to scrub; clicking the ruler jumps. Hovering a row highlights the link on the canvas, hovering a bar shows its times, clicking a bar selects the stream. Links without traffic collapse into a footer line. The dock collapses and resizes; its size is remembered.
 - Everything autosaves to `localStorage` and is restored on reload. Playback always starts stopped at `t = 0`.
 
-## Schedule (mocked for now)
+## Schedule
 
 The animation is driven by a `Schedule`: for every stream, one transmission per
 period described hop by hop with `tx_start_ns`, `tx_end_ns` and `rx_end_ns`
-offsets. Today it comes from `mockScheduler` in `src/model/schedule.ts`, which
-spreads streams across their period and chains hops store-and-forward using
-`message_size / bandwidth` for transmission and `5 ns/m × length` for
-propagation. Timing correctness is not the point yet; the UI is.
+offsets. The live editor gets this from the Rust/Wasm simulation, which is the
+single source of truth for schedule generation in the current development build.
 
 Playback runs in slow motion. The speed dial sets how much simulated time passes
 per real second, on 1-2-5 steps from 5 µs/s (a 1 kB frame on 1 Gbit/s, 8 µs on
@@ -36,11 +34,11 @@ times the longest period, the dock falls back to the longest period and shows a
 "capped" badge; streams with other periods then do not repeat exactly inside
 the window.
 
-### Replacing the mock scheduler
+### Scheduler integration
 
-Implement the `Scheduler` interface (`src/model/schedule.ts`) and point
-`defaultScheduler` at it, or map the Rust scheduler's output onto the `Schedule`
-shape. Nothing in the rendering path depends on how the times were produced.
+The rendering path consumes the `Schedule` shape only; the scheduling logic is
+provided by the Rust/Wasm simulator. The editor does not keep a TypeScript mock
+implementation in the runtime path.
 
 ## Development
 
@@ -58,7 +56,7 @@ npm run build     # production build in dist/
 ```
 src/
 ├─ model/        pure TypeScript: types mirroring scheduler-core, graph ops, routing, streams, persistence,
-│                schedule (Scheduler seam + mock), packets (positions and lanes), playback clock, bezier geometry, colors,
+│                schedule (output contract), packets (positions and lanes), playback clock, bezier geometry, colors,
 │                timeline (hyperperiod, rows, lanes, ruler ticks)
 ├─ store/        zustand editor store (single source of truth), playback store, ui store (hover, dock prefs),
 │                debounced autosave hook

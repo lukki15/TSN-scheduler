@@ -1,5 +1,5 @@
 import init, { run_mock_simulation } from 'scheduler-wasm';
-import { defaultScheduler, type Schedule } from '../model/schedule';
+import type { Schedule } from '../model/schedule';
 import type { GraphLink, Stream } from '../model/types';
 
 const wasmInit = (() => {
@@ -51,13 +51,8 @@ export function toWasmSimulationRequest(streams: readonly Stream[], links: reado
 }
 
 export async function runSchedulerWasm(streams: readonly Stream[], links: readonly GraphLink[]): Promise<Schedule> {
-    try {
-        await wasmInit();
-        const request = toWasmSimulationRequest(streams, links);
-        const result = run_mock_simulation(JSON.stringify(request));
-        return JSON.parse(result) as Schedule;
-    } catch (error) {
-        console.warn('[scheduler-wasm] falling back to TypeScript mock schedule', error);
-        return defaultScheduler.schedule(streams, links);
-    }
+    await wasmInit();
+    const request = toWasmSimulationRequest(streams, links);
+    const result = run_mock_simulation(JSON.stringify(request));
+    return JSON.parse(result) as Schedule;
 }

@@ -1,6 +1,5 @@
 import { DEFAULT_LINK } from './defaults';
-import { indexLinks } from './graph';
-import type { GraphLink, LinkId, NodeKey, Stream, StreamId } from './types';
+import type { LinkId, NodeKey, StreamId } from './types';
 
 /**
  * Schedule model.
@@ -33,12 +32,6 @@ export interface Schedule {
     streams: StreamSchedule[];
 }
 
-/** Pluggable like RoutingStrategy; the Rust scheduler's output will be adapted to this interface. */
-export interface Scheduler {
-    readonly name: string;
-    schedule(streams: readonly Stream[], links: readonly GraphLink[]): Schedule;
-}
-
 export const EMPTY_SCHEDULE: Schedule = Object.freeze({ streams: [] }) as Schedule;
 
 /** Signal propagation speed assumption for copper/fibre. */
@@ -61,41 +54,3 @@ export function streamOffsetNs(index: number, count: number, periodNs: number): 
     return Math.floor((index / count) * periodNs);
 }
 
-/**
- * Mock scheduler: deterministic, side-effect free, store-and-forward along the
- * stream's computed route. Indices are taken over all streams in array order
- * (creation order) so offsets do not shuffle when a stream becomes unroutable.
- */
-export const mockScheduler: Scheduler = {
-    name: 'mock-spread',
-    schedule(streams, links) {
-        const result: StreamSchedule[] = [];
-        const count = streams.length;
-        const linkBetween = indexLinks(links);
-
-        streams.forEach((stream, index) => {
-            if (stream.status !== 'ok' || stream.period_ns <= 0 || stream.route.length < 2) return;
-
-            const hops: HopSchedule[] = [];
-            let t = streamOffsetNs(index, count, stream.period_ns);
-
-            for (let i = 0; i + 1 < stream.route.length; i++) {
-                const from = stream.route[i];
-                const to = stream.route[i + 1];
-                const link = linkBetween(from, to);
-                if (!link) return; // stale route: skip the stream until it is recomputed
-                const tx_start_ns = t;
-                const tx_end_ns = tx_start_ns + transmissionNs(stream.message_size, link.data.bandwidth);
-                const rx_end_ns = tx_end_ns + propagationNs(link.data.length);
-                hops.push({ link_id: link.id, from, to, tx_start_ns, tx_end_ns, rx_end_ns });
-                t = rx_end_ns;
-            }
-
-            result.push({ stream_id: stream.id, period_ns: stream.period_ns, hops });
-        });
-
-        return result.length === 0 ? EMPTY_SCHEDULE : { streams: result };
-    },
-};
-
-export const defaultScheduler: Scheduler = mockScheduler;

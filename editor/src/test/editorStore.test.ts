@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_LINK, DEFAULT_PRECISION } from '../model/defaults';
 import { EMPTY_SNAPSHOT, deserialize, serialize } from '../model/persistence';
-import { EMPTY_SCHEDULE } from '../model/schedule';
+import { EMPTY_SCHEDULE, type Schedule } from '../model/schedule';
 import { EMPTY_HIGHLIGHT } from '../model/streams';
+import * as wasmScheduler from '../simulation/wasm';
 import { dataFromSnapshot, snapshotOf, useEditorStore } from '../store/editorStore';
 
 const store = () => useEditorStore.getState();
@@ -21,7 +22,57 @@ function chain() {
     return { a, b, c };
 }
 
+function mockScheduleFromStreams(
+    streams: { id: string; route: string[]; period_ns: number; message_size: number }[],
+    edges: { id: string; source: string; target: string; data: { length: number; bandwidth: number } }[],
+): Schedule {
+    return {
+        streams: streams
+            .filter((stream) => stream.route.length >= 2)
+            .map((stream) => {
+                let t = 0;
+                const hops = stream.route.slice(0, -1).map((from, index) => {
+                    const to = stream.route[index + 1];
+                    const link = edges.find((edge) => (edge.source === from && edge.target === to) || (edge.source === to && edge.target === from));
+                    const bandwidth = link?.data.bandwidth ?? DEFAULT_LINK.bandwidth;
+                    const txStart = t;
+                    const txEnd = txStart + (stream.message_size * 8 * 1000) / bandwidth;
+                    const rxEnd = txEnd + (link?.data.length ?? 0) * 5;
+                    t = rxEnd;
+                    return {
+                        link_id: link?.id ?? `${from}-${to}`,
+                        from,
+                        to,
+                        tx_start_ns: txStart,
+                        tx_end_ns: txEnd,
+                        rx_end_ns: rxEnd,
+                    };
+                });
+                return {
+                    stream_id: stream.id,
+                    period_ns: stream.period_ns,
+                    hops,
+                };
+            }),
+    };
+}
+
 beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(wasmScheduler, 'runSchedulerWasm').mockImplementation(async (streams, links) => mockScheduleFromStreams(
+        streams.map((stream) => ({
+            id: stream.id,
+            route: stream.route,
+            period_ns: stream.period_ns,
+            message_size: stream.message_size,
+        })),
+        links.map((link) => ({
+            id: link.id,
+            source: link.source,
+            target: link.target,
+            data: { length: link.data.length, bandwidth: link.data.bandwidth },
+        })),
+    ));
     useEditorStore.setState(dataFromSnapshot(EMPTY_SNAPSHOT));
 });
 
@@ -168,6 +219,19 @@ describe('removals that cannot affect routes', () => {
 });
 
 describe('schedule', () => {
+    it('uses the wasm scheduler for derived route schedules', async () => {
+        const spy = vi.spyOn(wasmScheduler, 'runSchedulerWasm').mockResolvedValue({ streams: [{ stream_id: 's', period_ns: 1_000, hops: [] }] });
+
+        const { a, c } = chain();
+        const id = store().addStream();
+        store().updateStream(id, { start_node: a, end_node: c });
+
+        await vi.waitFor(() => {
+            expect(spy).toHaveBeenCalled();
+        });
+        expect(store().schedule).toEqual({ streams: [{ stream_id: 's', period_ns: 1_000, hops: [] }] });
+    });
+
     it('keeps its identity when nothing feeding it changed', () => {
         const { a, c } = chain();
         const id = store().addStream();
@@ -186,41 +250,61 @@ describe('schedule', () => {
         expect(store().schedule).toBe(before);
     });
 
-    it('is empty until a stream is routable', () => {
+    it('is empty until a stream is routable', async () => {
         const { a, c } = chain();
         expect(store().schedule).toBe(EMPTY_SCHEDULE);
         const id = store().addStream();
         expect(store().schedule).toBe(EMPTY_SCHEDULE);
         store().updateStream(id, { start_node: a, end_node: c });
-        expect(store().schedule.streams).toHaveLength(1);
+
+        await vi.waitFor(() => {
+            expect(store().schedule.streams).toHaveLength(1);
+        });
         expect(store().schedule.streams[0]).toMatchObject({ stream_id: id, period_ns: store().streams[0].period_ns });
         expect(store().schedule.streams[0].hops).toHaveLength(2);
     });
 
-    it('reacts to link attribute and topology changes', () => {
+    it('reacts to link attribute and topology changes', async () => {
         const { a, c } = chain();
         const id = store().addStream();
         store().updateStream(id, { start_node: a, end_node: c });
+
+        await vi.waitFor(() => {
+            expect(store().schedule.streams).toHaveLength(1);
+        });
         const before = store().schedule.streams[0].hops[0];
 
         store().updateLink(before.link_id, { bandwidth: 100 });
-        const slower = store().schedule.streams[0].hops[0];
-        expect(slower.tx_end_ns - slower.tx_start_ns).toBe(10 * (before.tx_end_ns - before.tx_start_ns));
+        await vi.waitFor(() => {
+            const slower = store().schedule.streams[0].hops[0];
+            expect(slower.tx_end_ns - slower.tx_start_ns).toBe(10 * (before.tx_end_ns - before.tx_start_ns));
+        });
 
         store().removeLink(before.link_id);
-        expect(store().schedule).toBe(EMPTY_SCHEDULE);
+        await vi.waitFor(() => {
+            expect(store().schedule).toBe(EMPTY_SCHEDULE);
+        });
 
         store().clearCanvas();
         expect(store().schedule).toBe(EMPTY_SCHEDULE);
     });
 
-    it('is restored from a snapshot', () => {
+    it('is restored from a snapshot', async () => {
         const { a, c } = chain();
         const id = store().addStream();
         store().updateStream(id, { start_node: a, end_node: c });
+
+        await vi.waitFor(() => {
+            expect(store().schedule.streams).toHaveLength(1);
+        });
+
         const restored = dataFromSnapshot(deserialize(serialize(snapshotOf(store())))!);
-        expect(restored.schedule.streams).toHaveLength(1);
-        expect(restored.schedule.streams[0].hops.map((h) => h.link_id)).toEqual(store().schedule.streams[0].hops.map((h) => h.link_id));
+        useEditorStore.setState(restored);
+
+        await vi.waitFor(() => {
+            expect(useEditorStore.getState().schedule.streams).toHaveLength(1);
+        });
+        expect(useEditorStore.getState().schedule.streams[0].hops.map((h) => h.link_id)).toEqual(store().schedule.streams[0].hops.map((h) => h.link_id));
     });
 });
 

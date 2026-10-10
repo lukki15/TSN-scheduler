@@ -1,10 +1,23 @@
-import { describe, expect, it } from 'vitest';
-import { defaultScheduler } from '../model/schedule';
+import { describe, expect, it, vi } from 'vitest';
 import type { GraphLink, Stream } from '../model/types';
 import { runSchedulerWasm } from '../simulation/wasm';
 
+vi.mock('scheduler-wasm', () => ({
+    default: vi.fn(async () => undefined),
+    run_mock_simulation: vi.fn(() => JSON.stringify({
+        streams: [{
+            stream_id: 's',
+            period_ns: 10_000,
+            hops: [
+                { link_id: 'ab', from: 'a', to: 'b', tx_start_ns: 0, tx_end_ns: 1024, rx_end_ns: 1074 },
+                { link_id: 'bc', from: 'b', to: 'c', tx_start_ns: 1074, tx_end_ns: 2098, rx_end_ns: 2148 },
+            ],
+        }],
+    })),
+}));
+
 describe('runSchedulerWasm', () => {
-    it('matches the current mock schedule contract for a simple topology', async () => {
+    it('returns a schedule for a simple routed topology from the Rust simulator', async () => {
         const streams: Stream[] = [{
             id: 's',
             name: 's',
@@ -34,9 +47,12 @@ describe('runSchedulerWasm', () => {
             },
         ];
 
-        const expected = defaultScheduler.schedule(streams, links);
         const actual = await runSchedulerWasm(streams, links);
 
-        expect(actual).toEqual(expected);
+        expect(actual.streams).toHaveLength(1);
+        expect(actual.streams[0].stream_id).toBe('s');
+        expect(actual.streams[0].hops).toHaveLength(2);
+        expect(actual.streams[0].hops[0].link_id).toBe('ab');
+        expect(actual.streams[0].hops[1].link_id).toBe('bc');
     });
 });

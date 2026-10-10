@@ -7,7 +7,7 @@
  * The second block holds editor-only concepts (stable keys, selection, routes).
  *
  * Type aliases (not interfaces) are used for node/edge data because React Flow
- * requires `Record<string, unknown>`-compatible data types.
+ * expects data objects shaped like `Record<string, unknown>`.
  */
 
 // ─── Rust mirrors ────────────────────────────────────────────────────────────
