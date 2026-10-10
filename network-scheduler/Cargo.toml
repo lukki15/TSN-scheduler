@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "crates/scheduler-core",
+    "crates/scheduler-simulation",
+    "crates/scheduler-wasm",
     "crates/scheduler-io",
     "crates/scheduler-cli",
 ]
