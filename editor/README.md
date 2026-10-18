@@ -12,16 +12,16 @@ whose routes are computed over the drawn network.
 - Create **streams** in the top-right panel, pick start and end node, and set `message_size`, `period_ns`, `e2e_latency_ns` and `max_jitter_ns`.
 - A stream's route is the shortest path by hop count. Selecting a stream highlights its route; streams that cannot be routed stay listed with a status badge.
 - Every stream has its own color, used for its row, its route highlight and its packets.
-- **Playback** (timeline toolbar): Play, Pause and Stop, an exponential speed dial from 5 µs/s to 5 ms/s, and a clock in µs. While playing, every routed stream's frames move along the drawn links, one transmission per period, hop by hop. A frame is drawn as a bar from its last bit to its first bit, so a long frame on a short link fills the link while a short frame travels as a short bar. Streams sharing a link ride separate lanes.
+- **Playback** (timeline toolbar): Play, Pause, Step and Stop, an exponential speed dial from 5 µs/s to 5 ms/s, and a clock in µs. The Rust/WASM engine owns simulation time and active frame state; the frontend paces it and draws its snapshots. Frames move along the drawn links, one transmission per period, hop by hop. Streams sharing a link ride separate visual lanes.
 - **Timeline dock** under the canvas: one row group per link with a sub-row per direction, bars for every transmission over one hyperperiod (solid while sending, lighter while the bits are still on the wire). A playhead follows the clock and can be dragged to scrub; clicking the ruler jumps. Hovering a row highlights the link on the canvas, hovering a bar shows its times, clicking a bar selects the stream. Links without traffic collapse into a footer line. The dock collapses and resizes; its size is remembered.
 - Everything autosaves to `localStorage` and is restored on reload. Playback always starts stopped at `t = 0`.
 
 ## Schedule
 
-The animation is driven by a `Schedule`: for every stream, one transmission per
+The Rust scheduler returns a `Schedule`: for every stream, one transmission per
 period described hop by hop with `tx_start_ns`, `tx_end_ns` and `rx_end_ns`
-offsets. The live editor gets this from the Rust/Wasm simulation, which is the
-single source of truth for schedule generation in the current development build.
+offsets. The Rust/WASM simulation engine loads that schedule, owns elapsed time
+and frame-event state, and supplies the snapshots rendered by the frontend.
 
 Playback runs in slow motion. The speed dial sets how much simulated time passes
 per real second, on 1-2-5 steps from 5 µs/s (a 1 kB frame on 1 Gbit/s, 8 µs on
@@ -36,9 +36,10 @@ the window.
 
 ### Scheduler integration
 
-The rendering path consumes the `Schedule` shape only; the scheduling logic is
-provided by the Rust/Wasm simulator. The editor does not keep a TypeScript mock
-implementation in the runtime path.
+Rust owns schedule generation and simulation results. TypeScript owns playback
+pacing and user interaction; it retains only presentation logic such as lane
+layout, canvas geometry and timeline rows. There is no TypeScript scheduling or
+in-flight frame projection in the runtime path.
 
 ## Development
 
@@ -56,7 +57,7 @@ npm run build     # production build in dist/
 ```
 src/
 ├─ model/        pure TypeScript: types mirroring scheduler-core, graph ops, routing, streams, persistence,
-│                schedule (output contract), packets (positions and lanes), playback clock, bezier geometry, colors,
+│                schedule (output contract), lane layout, playback clock, bezier geometry, colors,
 │                timeline (hyperperiod, rows, lanes, ruler ticks)
 ├─ store/        zustand editor store (single source of truth), playback store, ui store (hover, dock prefs),
 │                debounced autosave hook
