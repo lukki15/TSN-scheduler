@@ -4,12 +4,12 @@ import { Color, Container, Graphics, type Application as PixiApplication } from 
 import { useStoreApi, type InternalNode } from '@xyflow/react';
 import { cubicAt, cubicNormalAt, edgeGeometry, type AnchorHandle, type AnchorNode, type Cubic, type Point, type Side } from '../model/bezier';
 import { hueToCss } from '../model/colors';
-import { linkSources } from '../model/graph';
-import { buildLanes, packetsAt } from '../model/packets';
-import { timeAt, type Playback } from '../model/playback';
+import { buildLanes } from '../model/packets';
+import type { Playback } from '../model/playback';
 import type { Schedule } from '../model/schedule';
+import type { SimulationSnapshot } from '../simulation/wasm';
 import { hueByStream, selectedStreamId } from '../model/streams';
-import type { LinkId, NodeKey, Selection, Stream, StreamId } from '../model/types';
+import type { LinkId, Selection, Stream, StreamId } from '../model/types';
 import { useEditorStore, type EditorLink, type EditorNode } from '../store/editorStore';
 import { usePlaybackStore } from '../store/playbackStore';
 
@@ -39,7 +39,6 @@ interface Scene {
     lanes: Map<LinkId, Map<StreamId, number>>;
     edgesFor: EditorLink[] | null;
     edgeLookup: Map<LinkId, EditorLink>;
-    sourceOf: Map<LinkId, NodeKey>;
     streamsFor: Stream[] | null;
     hueOf: Map<StreamId, number>;
 }
@@ -57,7 +56,6 @@ function createScene(app: PixiApplication): Scene {
         lanes: new Map(),
         edgesFor: null,
         edgeLookup: new Map(),
-        sourceOf: new Map(),
         streamsFor: null,
         hueOf: new Map(),
     };
@@ -145,8 +143,8 @@ interface FrameInput {
     transform: [number, number, number];
     nodeLookup: Map<string, InternalNode<EditorNode>>;
     playback: Playback;
-    nowMs: number;
     schedule: Schedule;
+    snapshot: SimulationSnapshot | null;
     edges: EditorLink[];
     streams: Stream[];
     selection: Selection | null;
@@ -168,9 +166,11 @@ function renderFrame(scene: Scene, input: FrameInput) {
     if (scene.edgesFor !== input.edges) {
         scene.edgesFor = input.edges;
         scene.edgeLookup = new Map(input.edges.map((e) => [e.id, e]));
-        scene.sourceOf = linkSources(input.edges);
     }
-    const packets = packetsAt(input.schedule, timeAt(input.playback, input.nowMs), scene.sourceOf);
+    const packets = (input.snapshot?.frames ?? []).map((frame) => ({
+        ...frame,
+        routeProgress: frame.route_progress,
+    }));
     if (packets.length === 0) return;
 
     if (scene.lanesFor !== input.schedule) {
@@ -249,13 +249,13 @@ function PacketTicker({ resizeTo }: PacketLayerPixiProps) {
         const scene = sceneRef.current;
         if (!scene) return;
         const { transform, nodeLookup } = flow.getState();
-        const { schedule, edges, streams, selection } = useEditorStore.getState();
+        const { schedule, edges, streams, selection, simulationSnapshot } = useEditorStore.getState();
         renderFrame(scene, {
             transform,
             nodeLookup,
             playback: usePlaybackStore.getState(),
-            nowMs: performance.now(),
             schedule,
+            snapshot: simulationSnapshot,
             edges,
             streams,
             selection,

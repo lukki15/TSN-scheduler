@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { Gauge, Pause, Play, Square } from 'lucide-react';
+import { Gauge, Pause, Play, Square, StepForward } from 'lucide-react';
 import { SCALE_STEPS_NS_PER_S, formatScale, formatSimTime, periodIndex, scaleIndex } from '../model/playback';
 import { selectedStream } from '../model/streams';
 import { useEditorStore } from '../store/editorStore';
@@ -22,6 +22,8 @@ export function PlaybackControls() {
     const toggle = usePlaybackStore((s) => s.toggle);
     const stop = usePlaybackStore((s) => s.stop);
     const setScale = usePlaybackStore((s) => s.setScale);
+    const simulationReady = useEditorStore((s) => s.simulationReady);
+    const stepSimulation = useEditorStore((s) => s.stepSimulation);
     // Period of the selected stream for the clock's period index; 0 when none is selected
     const selectedPeriodNs = useEditorStore((s) => selectedStream(s.selection, s.streams)?.period_ns ?? 0);
 
@@ -45,16 +47,31 @@ export function PlaybackControls() {
 
     const isPlaying = status === 'playing';
     const isPaused = status === 'paused';
+    const step = () => {
+        const snapshot = stepSimulation();
+        if (snapshot) usePlaybackStore.getState().seek(snapshot.elapsed_time_ns);
+    };
 
     return (
         <div className="flex items-center gap-2">
             <button
                 onClick={toggle}
+                disabled={!simulationReady}
                 className={`${PILL} ${isPaused ? PILL_RESUME : PILL_IDLE}`}
                 title={isPlaying ? 'Pause playback' : isPaused ? 'Resume playback' : 'Play schedule'}
             >
                 {isPlaying ? <Pause size={14} /> : <Play size={14} className="fill-current" />}
                 <span className="text-xs font-bold">{isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play'}</span>
+            </button>
+
+            <button
+                onClick={step}
+                disabled={!simulationReady || isPlaying}
+                className={`${PILL} ${PILL_IDLE} !px-2.5 disabled:opacity-50 disabled:cursor-default`}
+                title="Advance to the next frame event"
+                aria-label="Step simulation"
+            >
+                <StepForward size={14} />
             </button>
 
             <button

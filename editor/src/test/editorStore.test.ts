@@ -59,6 +59,14 @@ function mockScheduleFromStreams(
 
 beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(wasmScheduler.SimulationClient.prototype, 'install').mockResolvedValue({
+        elapsed_time_ns: 0,
+        phase_time_ns: 0,
+        hyperperiod_ns: 0,
+        status: 'stopped',
+        frames: [],
+        stats: { generated_frames: 0, active_frames: 0, completed_frames: 0, dropped_frames: 0 },
+    });
     vi.spyOn(wasmScheduler, 'runSchedulerWasm').mockImplementation(async (streams, links) => mockScheduleFromStreams(
         streams.map((stream) => ({
             id: stream.id,
@@ -228,6 +236,7 @@ describe('schedule', () => {
 
         await vi.waitFor(() => {
             expect(spy).toHaveBeenCalled();
+            expect(store().schedule).toEqual({ streams: [{ stream_id: 's', period_ns: 1_000, hops: [] }] });
         });
         expect(store().schedule).toEqual({ streams: [{ stream_id: 's', period_ns: 1_000, hops: [] }] });
     });

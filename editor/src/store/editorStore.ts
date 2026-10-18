@@ -16,7 +16,8 @@ import { EMPTY_SNAPSHOT, browserStorage, loadSnapshot, type EditorSnapshot } fro
 import { defaultRouting } from '../model/routing';
 import { EMPTY_SCHEDULE, type Schedule } from '../model/schedule';
 import { buildRouteHighlight, newStream, recomputeRoutes, routesTouchNodes, routesUseLinks } from '../model/streams';
-import { runSchedulerWasm } from '../simulation/wasm';
+import { runSchedulerWasm, SimulationClient, type SimulationSnapshot, type SimulationStats } from '../simulation/wasm';
+import { usePlaybackStore } from './playbackStore';
 import type {
     EdgeData,
     LinkId,
@@ -44,6 +45,10 @@ export interface EditorData {
     routeHighlight: RouteHighlight;
     /** Derived from streams and links by the scheduler; drives packet playback. */
     schedule: Schedule;
+    simulationSnapshot: SimulationSnapshot | null;
+    simulationStats: SimulationStats;
+    simulationReady: boolean;
+    simulationError: string | null;
 }
 
 export interface EditorActions {
@@ -62,6 +67,11 @@ export interface EditorActions {
     select: (selection: Selection | null) => void;
     setViewport: (viewport: Viewport) => void;
     clearCanvas: () => void;
+    startSimulation: () => SimulationSnapshot | null;
+    pauseSimulation: () => SimulationSnapshot | null;
+    stepSimulation: () => SimulationSnapshot | null;
+    advanceSimulation: (timeNs: number) => SimulationSnapshot | null;
+    resetSimulation: () => SimulationSnapshot | null;
 }
 
 export type EditorState = EditorData & EditorActions;
@@ -76,21 +86,72 @@ type Topology = Pick<EditorData, 'nodes' | 'edges' | 'streams' | 'selection'>;
  * schedule object, and memos keyed on its identity stay warm.
  */
 let lastSchedule: { streams: Stream[]; edges: EditorLink[]; schedule: Schedule } | null = null;
+const simulationClient = new SimulationClient();
+const EMPTY_SIMULATION_STATS: SimulationStats = {
+    generated_frames: 0,
+    active_frames: 0,
+    completed_frames: 0,
+    dropped_frames: 0,
+};
+
+function equalStats(left: SimulationStats, right: SimulationStats): boolean {
+    return left.generated_frames === right.generated_frames
+        && left.active_frames === right.active_frames
+        && left.completed_frames === right.completed_frames
+        && left.dropped_frames === right.dropped_frames;
+}
+
+function publishSimulationSnapshot(snapshot: SimulationSnapshot | null): SimulationSnapshot | null {
+    if (!snapshot) return null;
+    const stats = simulationClient.stats() ?? snapshot.stats;
+    const current = useEditorStore.getState();
+    useEditorStore.setState({
+        simulationSnapshot: snapshot,
+        simulationStats: equalStats(current.simulationStats, stats) ? current.simulationStats : stats,
+        simulationError: null,
+    });
+    return snapshot;
+}
+
+function runSimulationAction(action: () => SimulationSnapshot | null): SimulationSnapshot | null {
+    try {
+        return publishSimulationSnapshot(action());
+    } catch (error) {
+        useEditorStore.setState({ simulationError: error instanceof Error ? error.message : String(error) });
+        return null;
+    }
+}
 
 function scheduleFor(streams: Stream[], edges: EditorLink[]): Schedule {
     if (lastSchedule && lastSchedule.streams === streams && lastSchedule.edges === edges) return lastSchedule.schedule;
 
     const schedule = EMPTY_SCHEDULE;
     lastSchedule = { streams, edges, schedule };
+    simulationClient.clear();
+    usePlaybackStore.getState().stop();
 
     if (streams.length > 0) {
-        void runSchedulerWasm(streams, edges).then((wasmSchedule) => {
+        void runSchedulerWasm(streams, edges).then(async (wasmSchedule) => {
             if (!lastSchedule || lastSchedule.streams !== streams || lastSchedule.edges !== edges) return;
+            const simulationSnapshot = await simulationClient.install(streams, edges, wasmSchedule);
+            if (!simulationSnapshot || !lastSchedule || lastSchedule.streams !== streams || lastSchedule.edges !== edges) return;
             lastSchedule.schedule = wasmSchedule;
             const state = useEditorStore.getState();
             if (state.streams === streams && state.edges === edges) {
-                useEditorStore.setState({ schedule: wasmSchedule });
+                useEditorStore.setState({
+                    schedule: wasmSchedule,
+                    simulationSnapshot,
+                    simulationStats: simulationClient.stats() ?? simulationSnapshot.stats,
+                    simulationReady: true,
+                    simulationError: null,
+                });
             }
+        }).catch((error: unknown) => {
+            if (!lastSchedule || lastSchedule.streams !== streams || lastSchedule.edges !== edges) return;
+            useEditorStore.setState({
+                simulationReady: false,
+                simulationError: error instanceof Error ? error.message : String(error),
+            });
         });
     }
 
@@ -98,13 +159,20 @@ function scheduleFor(streams: Stream[], edges: EditorLink[]): Schedule {
 }
 
 /** Recomputes routes, the highlight and the schedule for a topology change, all inside one state update. */
-function withRoutes<T extends Topology>(state: T): T & Pick<EditorData, 'streams' | 'routeHighlight' | 'schedule'> {
+function withRoutes<T extends Topology>(state: T): T & Pick<
+    EditorData,
+    'streams' | 'routeHighlight' | 'schedule' | 'simulationSnapshot' | 'simulationStats' | 'simulationReady' | 'simulationError'
+> {
     const streams = recomputeRoutes(state.streams, state.nodes, state.edges, defaultRouting);
     return {
         ...state,
         streams,
         routeHighlight: buildRouteHighlight(state.selection, streams, state.edges),
         schedule: scheduleFor(streams, state.edges),
+        simulationSnapshot: null,
+        simulationStats: EMPTY_SIMULATION_STATS,
+        simulationReady: false,
+        simulationError: null,
     };
 }
 
@@ -291,7 +359,15 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
     setViewport: (viewport) => set({ viewport }),
 
+    startSimulation: () => runSimulationAction(() => simulationClient.start()),
+    pauseSimulation: () => runSimulationAction(() => simulationClient.pause()),
+    stepSimulation: () => runSimulationAction(() => simulationClient.step()),
+    advanceSimulation: (timeNs) => runSimulationAction(() => simulationClient.advanceTo(timeNs)),
+    resetSimulation: () => runSimulationAction(() => simulationClient.reset()),
+
     clearCanvas: () => {
+        simulationClient.clear();
+        usePlaybackStore.getState().stop();
         set({ ...dataFromSnapshot(EMPTY_SNAPSHOT), viewport: get().viewport });
     },
 }));

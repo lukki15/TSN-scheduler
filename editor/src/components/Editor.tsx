@@ -6,11 +6,13 @@ import { EditorCanvas } from './EditorCanvas';
 import { PacketLayerPixi } from './PacketLayerPixi';
 import { Sidebar } from './Sidebar';
 import { StreamsPanel } from './StreamsPanel';
+import { useSimulationPlayback } from './usePlaybackFrame';
 import { Inspector } from './inspector/Inspector';
 import { TimelineDock } from './timeline/TimelineDock';
 
 export function Editor() {
     usePersistence();
+    useSimulationPlayback();
     const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
     return (

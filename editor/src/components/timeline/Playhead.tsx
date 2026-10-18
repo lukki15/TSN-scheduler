@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { useEditorStore } from '../../store/editorStore';
 import { usePlaybackFrame } from '../usePlaybackFrame';
 import { LABEL_WIDTH, xOf } from './geometry';
 import type { ScrubHandlers } from './useScrub';
@@ -24,7 +25,8 @@ export function Playhead({ windowNs, width, scrub }: PlayheadProps) {
             (timeNs: number) => {
                 const el = lineRef.current;
                 if (!el || windowNs <= 0) return;
-                const transform = `translateX(${xOf(timeNs % windowNs, windowNs, width)}px)`;
+                const phaseTimeNs = useEditorStore.getState().simulationSnapshot?.phase_time_ns ?? timeNs;
+                const transform = `translateX(${xOf(phaseTimeNs % windowNs, windowNs, width)}px)`;
                 if (transform === lastTransform.current) return;
                 lastTransform.current = transform;
                 el.style.transform = transform;

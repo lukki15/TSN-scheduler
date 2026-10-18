@@ -20,6 +20,9 @@ export function StreamsPanel() {
     const addStream = useEditorStore((s) => s.addStream);
     const removeStream = useEditorStore((s) => s.removeStream);
     const select = useEditorStore((s) => s.select);
+    const stats = useEditorStore((s) => s.simulationStats);
+    const simulationReady = useEditorStore((s) => s.simulationReady);
+    const simulationError = useEditorStore((s) => s.simulationError);
     const [collapsed, setCollapsed] = useState(false);
 
 
@@ -49,6 +52,23 @@ export function StreamsPanel() {
             {/* Collapsible body */}
             {!collapsed && (
                 <div className="px-3 pb-3">
+                    <div className="mb-3 border-y border-slate-100 py-2" aria-label="Simulation statistics">
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                            {simulationError ? 'Simulation error' : simulationReady ? 'Simulation frames' : 'Simulation loading'}
+                        </div>
+                        {simulationError ? (
+                            <p className="text-[10px] leading-snug text-rose-600" title={simulationError}>
+                                {simulationError}
+                            </p>
+                        ) : (
+                            <div className="grid grid-cols-4 gap-1 text-[9px] font-mono tabular-nums text-slate-600">
+                                <span title="Generated frames">gen {stats.generated_frames}</span>
+                                <span title="Frames currently in flight">active {stats.active_frames}</span>
+                                <span title="Completed frames">done {stats.completed_frames}</span>
+                                <span title="Dropped frames">drop {stats.dropped_frames}</span>
+                            </div>
+                        )}
+                    </div>
                     <div className="space-y-2 max-h-[40vh] overflow-y-auto">
                         {streams.map((stream) => {
                             const isSelected = stream.id === selectedId;

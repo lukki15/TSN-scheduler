@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { timeAt } from '../model/playback';
+import { useEditorStore } from '../store/editorStore';
 import { usePlaybackStore } from '../store/playbackStore';
 
 /**
@@ -11,14 +12,19 @@ import { usePlaybackStore } from '../store/playbackStore';
 export function usePlaybackFrame(draw: (timeNs: number) => void): void {
     useEffect(() => {
         let frame = 0;
-        const paint = () => draw(timeAt(usePlaybackStore.getState(), performance.now()));
+        const paint = () => {
+            const elapsed = useEditorStore.getState().simulationSnapshot?.elapsed_time_ns
+                ?? timeAt(usePlaybackStore.getState(), performance.now());
+            draw(elapsed);
+        };
         const loop = () => {
             paint();
             frame = requestAnimationFrame(loop);
         };
         const sync = () => {
+            const status = usePlaybackStore.getState().status;
             cancelAnimationFrame(frame);
-            if (usePlaybackStore.getState().status === 'playing') loop();
+            if (status === 'playing') loop();
             else paint();
         };
         sync();
@@ -28,4 +34,41 @@ export function usePlaybackFrame(draw: (timeNs: number) => void): void {
             cancelAnimationFrame(frame);
         };
     }, [draw]);
+}
+
+/** Owns the single Rust lifecycle/advance loop for the mounted editor. */
+export function useSimulationPlayback(): void {
+    useEffect(() => {
+        let frame = 0;
+        let previousStatus = usePlaybackStore.getState().status;
+        const advance = () => {
+            const playback = usePlaybackStore.getState();
+            if (playback.status !== 'stopped') {
+                const targetTimeNs = Math.floor(timeAt(playback, performance.now()));
+                useEditorStore.getState().advanceSimulation(targetTimeNs);
+            }
+        };
+        const loop = () => {
+            advance();
+            frame = requestAnimationFrame(loop);
+        };
+        const sync = () => {
+            const status = usePlaybackStore.getState().status;
+            if (status !== previousStatus) {
+                if (status === 'playing') useEditorStore.getState().startSimulation();
+                else if (status === 'paused') useEditorStore.getState().pauseSimulation();
+                else useEditorStore.getState().resetSimulation();
+                previousStatus = status;
+            }
+            cancelAnimationFrame(frame);
+            if (status === 'playing') loop();
+            else advance();
+        };
+        sync();
+        const unsubscribe = usePlaybackStore.subscribe(sync);
+        return () => {
+            unsubscribe();
+            cancelAnimationFrame(frame);
+        };
+    }, []);
 }
