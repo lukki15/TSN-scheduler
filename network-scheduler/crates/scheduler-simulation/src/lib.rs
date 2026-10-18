@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+mod engine;
+
+pub use engine::{
+    EngineError, EngineStatus, FramePhase, FrameSnapshot, SimulationEngine, SimulationSnapshot,
+    SimulationStats,
+};
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Link {
     pub id: String,
