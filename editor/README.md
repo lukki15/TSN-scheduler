@@ -43,7 +43,16 @@ in-flight frame projection in the runtime path.
 
 ## Development
 
+The editor depends on the generated package in
+`network-scheduler/crates/scheduler-wasm/pkg`. Install the Rust WASM target and
+`wasm-pack` once, then build the package on a fresh checkout or after changing
+the Rust simulation or WASM bindings:
+
 ```bash
+rustup target add wasm32-unknown-unknown
+cargo install wasm-pack --locked   # one-time setup, if wasm-pack is not installed
+cd editor
+npm run build:wasm
 npm install
 npm run dev       # start vite on http://localhost:5173
 npm run lint      # eslint
@@ -51,6 +60,9 @@ npx tsc -b        # typecheck
 npm test          # vitest unit tests for src/model and the store
 npm run build     # production build in dist/
 ```
+
+Frontend-only changes do not require rebuilding the WASM package. The generated
+`pkg` directory is local build output and is not tracked in git.
 
 ## Layout
 

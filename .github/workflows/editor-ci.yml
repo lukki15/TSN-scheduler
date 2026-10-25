@@ -45,8 +45,7 @@ jobs:
         run: cargo install wasm-pack --locked
 
       - name: Build scheduler-wasm package
-        working-directory: network-scheduler/crates/scheduler-wasm
-        run: wasm-pack build --target web --out-dir pkg
+        run: npm run build:wasm
 
       - name: Install dependencies
         run: npm ci
