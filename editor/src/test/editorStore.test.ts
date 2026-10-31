@@ -241,6 +241,32 @@ describe('schedule', () => {
         expect(store().schedule).toEqual({ streams: [{ stream_id: 's', period_ns: 1_000, hops: [] }] });
     });
 
+    it('publishes a pending schedule after a non-scheduling stream edit', async () => {
+        const pending: ((schedule: Schedule) => void)[] = [];
+        vi.spyOn(wasmScheduler, 'runSchedulerWasm').mockImplementation(
+            () => new Promise((resolve) => pending.push(resolve)),
+        );
+
+        const { a, c } = chain();
+        const id = store().addStream();
+        store().updateStream(id, { start_node: a, end_node: c });
+        const scheduledStreams = store().streams;
+        const scheduledEdges = store().edges;
+        const schedule = mockScheduleFromStreams(scheduledStreams, scheduledEdges);
+
+        store().updateStream(id, { name: 'renamed' });
+        expect(pending).toHaveLength(2);
+
+        pending[0]({ streams: [] });
+        pending[1](schedule);
+
+        await vi.waitFor(() => {
+            expect(store().simulationReady).toBe(true);
+            expect(store().schedule).toEqual(schedule);
+        });
+        expect(store().streams[0].name).toBe('renamed');
+    });
+
     it('keeps its identity when nothing feeding it changed', () => {
         const { a, c } = chain();
         const id = store().addStream();

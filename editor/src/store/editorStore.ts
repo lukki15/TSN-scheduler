@@ -122,6 +122,40 @@ function runSimulationAction(action: () => SimulationSnapshot | null): Simulatio
     }
 }
 
+function sameScheduleInputs(
+    streams: readonly Stream[],
+    edges: readonly EditorLink[],
+    expectedStreams: readonly Stream[],
+    expectedEdges: readonly EditorLink[],
+): boolean {
+    return streams.length === expectedStreams.length
+        && streams.every((stream, index) => {
+            const expected = expectedStreams[index];
+            return stream.id === expected.id
+                && stream.message_size === expected.message_size
+                && stream.period_ns === expected.period_ns
+                && stream.status === expected.status
+                && stream.route.length === expected.route.length
+                && stream.route.every((node, routeIndex) => node === expected.route[routeIndex]);
+        })
+        && edges.length === expectedEdges.length
+        && edges.every((edge, index) => {
+            const expected = expectedEdges[index];
+            return edge.id === expected.id
+                && edge.source === expected.source
+                && edge.target === expected.target
+                && edge.data.length === expected.data.length
+                && edge.data.bandwidth === expected.data.bandwidth;
+        });
+}
+
+function currentScheduleFor(streams: Stream[], edges: EditorLink[]): NonNullable<typeof lastSchedule> | null {
+    const activeSchedule = lastSchedule;
+    if (!activeSchedule || activeSchedule.streams !== streams || activeSchedule.edges !== edges) return null;
+    const state = useEditorStore.getState();
+    return sameScheduleInputs(state.streams, state.edges, streams, edges) ? activeSchedule : null;
+}
+
 function scheduleFor(streams: Stream[], edges: EditorLink[]): Schedule {
     if (lastSchedule && lastSchedule.streams === streams && lastSchedule.edges === edges) return lastSchedule.schedule;
 
@@ -132,22 +166,20 @@ function scheduleFor(streams: Stream[], edges: EditorLink[]): Schedule {
 
     if (streams.length > 0) {
         void runSchedulerWasm(streams, edges).then(async (wasmSchedule) => {
-            if (!lastSchedule || lastSchedule.streams !== streams || lastSchedule.edges !== edges) return;
+            if (!currentScheduleFor(streams, edges)) return;
             const simulationSnapshot = await simulationClient.install(streams, edges, wasmSchedule);
-            if (!simulationSnapshot || !lastSchedule || lastSchedule.streams !== streams || lastSchedule.edges !== edges) return;
-            lastSchedule.schedule = wasmSchedule;
-            const state = useEditorStore.getState();
-            if (state.streams === streams && state.edges === edges) {
-                useEditorStore.setState({
-                    schedule: wasmSchedule,
-                    simulationSnapshot,
-                    simulationStats: simulationClient.stats() ?? simulationSnapshot.stats,
-                    simulationReady: true,
-                    simulationError: null,
-                });
-            }
+            const activeSchedule = currentScheduleFor(streams, edges);
+            if (!simulationSnapshot || !activeSchedule) return;
+            activeSchedule.schedule = wasmSchedule;
+            useEditorStore.setState({
+                schedule: wasmSchedule,
+                simulationSnapshot,
+                simulationStats: simulationClient.stats() ?? simulationSnapshot.stats,
+                simulationReady: true,
+                simulationError: null,
+            });
         }).catch((error: unknown) => {
-            if (!lastSchedule || lastSchedule.streams !== streams || lastSchedule.edges !== edges) return;
+            if (!currentScheduleFor(streams, edges)) return;
             useEditorStore.setState({
                 simulationReady: false,
                 simulationError: error instanceof Error ? error.message : String(error),
